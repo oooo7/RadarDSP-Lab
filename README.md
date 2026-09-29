@@ -144,21 +144,27 @@ Generated plots are saved to `experiments/`:
 
 ## 📐 MATLAB Golden Reference & Cross-Validation (Phase 10)
 
-Phase 10 provides an independent MATLAB reference implementation for core DSP and FMCW calculations to evaluate mathematical model equivalence and numerical agreement against Python.
+Phase 10 provides an independent MATLAB reference implementation for core DSP and FMCW calculations to evaluate mathematical model equivalence against Python.
 
-### Features
+### Validation Status Summary
+- **MATLAB Source Implementation:** **COMPLETE / IMPLEMENTED**
+- **Python Reference Export:** **EXECUTED / PASS**
+- **MATLAB Runtime Execution:** **NOT AVAILABLE** *(Neither MATLAB nor GNU Octave is installed in the execution environment)*
+- **Python ↔ MATLAB Live Runtime Comparison:** **PENDING RUNTIME EXECUTION**
+
+### Features & Scope
 1. **DSP Reference (`matlab/dsp/`):** Sine generation, multitone synthesis, Nyquist foldover aliasing ($f_{\text{alias}} = |(f+F_s/2)\bmod F_s - F_s/2|$), 1D FFT magnitude scaling.
 2. **FMCW Radar Reference (`matlab/radar/`):** FMCW chirp synthesis, stretch-dechirp single target range estimation, multi-target 2D Range-Doppler FFT processing, complex AWGN noise addition, 2D CA-CFAR adaptive thresholding.
 3. **Automated Cross-Validation (`matlab/validation/cross_validate_python.m`):** Runs quantitative comparisons within physical resolution tolerances ($\Delta R = c/(2B)$, $\Delta v = \lambda/(2M T_c)$).
 
 ### Run Cross-Validation
 ```matlab
-% In MATLAB / Octave command prompt:
+% In MATLAB / Octave command prompt (when environment is available):
 addpath('matlab/validation');
 cross_validate_python('experiments/results/python_reference_results.json');
 ```
 
-*Note: MATLAB serves as an independent golden-reference implementation for selected DSP and FMCW radar calculations. Agreement is evaluated numerically within documented tolerances rather than assumed to be bit-for-bit identical.*
+*Note: MATLAB serves as an independent golden-reference implementation for selected DSP and FMCW radar calculations. The MATLAB source has been implemented and statically reviewed; MATLAB runtime execution was not available because neither MATLAB nor GNU Octave is installed. Therefore, live Python ↔ MATLAB runtime numerical comparison is documented as pending runtime execution rather than claimed as verified.*
 
 ---
 

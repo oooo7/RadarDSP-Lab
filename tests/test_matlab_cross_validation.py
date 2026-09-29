@@ -1,7 +1,11 @@
 """Tests for Phase 10 MATLAB Golden Reference & Cross-Validation infrastructure.
 
-Validates the structure of exported python_reference_results.json, checks mathematical agreement
-between Python models and MATLAB reference definitions, and ensures numerical tolerances are strictly met.
+Validates the structure of exported python_reference_results.json, checks mathematical specifications
+used for cross-validation, and verifies the static existence of MATLAB reference scripts.
+
+Note:
+    MATLAB runtime execution was NOT performed in this environment because neither MATLAB nor Octave CLI is installed.
+    These tests validate Python reference data export and theoretical mathematical equations in PyTest.
 """
 
 import json
@@ -23,8 +27,8 @@ MATLAB_DIR = PROJECT_ROOT / "matlab"
 SPEED_OF_LIGHT_M_PER_S = float(scipy.constants.c)
 
 
-def test_python_reference_json_exists_and_valid():
-    """Verify that python_reference_results.json exists and has complete structure."""
+def test_python_reference_export_json_validity():
+    """Verify that exported python_reference_results.json exists and contains complete reference sections."""
     json_path = RESULTS_DIR / "python_reference_results.json"
     assert json_path.exists(), f"Missing exported reference JSON at {json_path}"
 
@@ -39,14 +43,14 @@ def test_python_reference_json_exists_and_valid():
     assert "ca_cfar" in data
 
 
-def test_dsp_alias_reference_math():
-    """Verify DSP aliasing reference calculation (700 Hz @ 1000 Hz Fs -> 300 Hz)."""
+def test_dsp_alias_theoretical_specification():
+    """Verify theoretical DSP aliasing formula (700 Hz @ 1000 Hz Fs -> 300 Hz alias foldover)."""
     f_alias = calculate_alias_frequency(700.0, 1000.0)
     assert abs(f_alias - 300.0) < 1e-6
 
 
-def test_fmcw_range_cross_validation_tolerances():
-    """Verify that Python estimated ranges across 50-500m are within physical resolution Delta_R."""
+def test_python_fmcw_range_reference_tolerances():
+    """Verify that Python exported reference single-target ranges (50-500m) are within physical resolution Delta_R."""
     config = RadarConfig(
         carrier_frequency_hz=77e9,
         sweep_bandwidth_hz=150e6,
@@ -64,14 +68,13 @@ def test_fmcw_range_cross_validation_tolerances():
 
     for item in st_results:
         target_r = item["true_range_m"]
-        est_r = item["estimated_range_m"]
         abs_err = item["abs_error_m"]
 
         assert abs_err <= delta_r, f"Range error {abs_err:.4f}m for target {target_r}m exceeds Delta_R={delta_r:.4f}m"
 
 
-def test_cfar_alpha_cross_validation_equation():
-    """Verify CA-CFAR alpha formula alpha = N * (Pfa^(-1/N) - 1)."""
+def test_cfar_alpha_theoretical_equation():
+    """Verify 2D CA-CFAR alpha multiplier equation alpha = N * (Pfa^(-1/N) - 1)."""
     pfa = 1e-4
     n_train = 144
     alpha_py = calculate_ca_cfar_alpha(pfa, n_train)
@@ -82,8 +85,8 @@ def test_cfar_alpha_cross_validation_equation():
     assert abs(alpha_py - 9.51127) < 1e-3
 
 
-def test_matlab_files_exist():
-    """Verify all Phase 10 MATLAB golden reference scripts exist in matlab/ directory."""
+def test_matlab_source_files_exist():
+    """Verify all Phase 10 MATLAB golden reference scripts exist statically in matlab/ directory."""
     expected_files = [
         MATLAB_DIR / "README.md",
         MATLAB_DIR / "dsp" / "generate_sine.m",

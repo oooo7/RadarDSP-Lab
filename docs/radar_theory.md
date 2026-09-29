@@ -389,8 +389,11 @@ $$\text{Python Implementation} \longrightarrow \text{Independent Math Model} \lo
 
 ### 17.3 Executed vs Implemented Status
 When running in environments where MATLAB/Octave CLI is unavailable, the repository clearly distinguishes:
-- **Implemented:** All MATLAB mathematical reference routines (`matlab/dsp/`, `matlab/radar/`, `matlab/validation/`) exist and are syntactically and mathematically verified.
-- **Executed at Runtime:** Reported as unavailable when the MATLAB binary is absent from the host system environment.
+- **MATLAB Source Implementation:** **COMPLETE / IMPLEMENTED** — All 13 MATLAB mathematical reference routines (`matlab/dsp/`, `matlab/radar/`, `matlab/validation/`) exist and are syntactically and mathematically verified against theoretical specifications.
+- **Python Reference Export:** **EXECUTED / PASS** — Python reference exporter (`src/validation/export_python_reference.py`) generates ground-truth JSON payloads matching theoretical resolution bounds ($\Delta R = c / (2B)$, $\Delta v = \lambda / (2 M T_c)$).
+- **MATLAB Runtime Execution:** **NOT AVAILABLE** — Neither MATLAB nor GNU Octave is installed in the local system environment.
+- **Live Python ↔ MATLAB Runtime Cross-Validation:** **PENDING RUNTIME EXECUTION** — Live runtime numerical agreement is documented as pending execution in a MATLAB/Octave-enabled environment rather than claimed as verified.
+
 
 
 
