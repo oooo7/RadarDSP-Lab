@@ -267,3 +267,79 @@ $$|H(f_c)| = \frac{1}{\sqrt{2}} \approx 0.7071 \implies 20 \log_{10} |H(f_c)| \a
 2. **Boundary Transient Spectral Floor:**
    Because zero-phase filtering uses finite signal padding at the signal boundaries, boundary transients of strong passband tones create a dynamic spectral leakage floor ($\sim -75\text{ dB}$ to $-83\text{ dB}$) when performing uncropped FFTs on finite duration buffers where theoretical stopband attenuation exceeds $-100\text{ dB}$. Steady-state causal filtering on cropped signals matches theoretical `freqz`/`sosfreqz` curves to full machine precision.
 
+---
+
+## 7. Multirate Digital Signal Processing Engine (Phase 5)
+
+Multirate DSP involves processing discrete-time signals at multiple sampling rates to optimize computational efficiency, match hardware interfaces, or isolate spectral bands.
+
+### 7.1 Decimation & Anti-Aliasing Filtering
+
+Decimation reduces the sampling rate of a signal by an integer factor $M \ge 1$:
+
+$$F_{s,\text{out}} = \frac{F_{s,\text{in}}}{M}, \quad \text{Nyquist}_{\text{out}} = \frac{F_{s,\text{out}}}{2} = \frac{F_{s,\text{in}}}{2M}$$
+
+#### Decimation Pipeline:
+1. **Anti-Aliasing Filter:** Pass signal $x[n]$ through a lowpass filter with cutoff frequency $f_c \le \frac{F_{s,\text{out}}}{2}$ to suppress all frequency components above the new Nyquist limit.
+2. **Downsampling:** Retain every $M$-th sample of the filtered signal: $y[n] = v[n \cdot M]$.
+
+#### Naive Downsampling vs. Proper Decimation:
+- **Naive Downsampling ($x[::M]$):** Retaining every $M$-th sample without lowpass filtering causes any signal content in the stopband $f > \frac{F_{s,\text{out}}}{2}$ to fold over and alias into $[0, F_{s,\text{out}}/2]$.
+- **Proper Decimation:** Pre-filtering with an anti-aliasing filter removes stopband energy, preventing aliasing distortion.
+
+---
+
+### 7.2 Interpolation & Anti-Imaging Filtering
+
+Interpolation increases the sampling rate of a signal by an integer factor $L \ge 1$:
+
+$$F_{s,\text{out}} = L \cdot F_{s,\text{in}}, \quad \text{Nyquist}_{\text{out}} = \frac{F_{s,\text{out}}}{2} = \frac{L \cdot F_{s,\text{in}}}{2}$$
+
+#### Interpolation Pipeline:
+1. **Zero Insertion (Upsampling):** Insert $L - 1$ zeros between consecutive samples of $x[n]$:
+
+   $$x_{\text{up}}[m] = \begin{cases} x[m / L] & \text{if } m = 0, \pm L, \pm 2L, \dots \\ 0 & \text{otherwise} \end{cases}$$
+
+2. **Anti-Imaging Filter:** Pass $x_{\text{up}}[m]$ through a lowpass reconstruction filter with cutoff frequency $f_c = \frac{F_{s,\text{in}}}{2}$ and linear amplitude gain scaling factor $L$.
+
+#### Spectral Images & Anti-Imaging Filter:
+- Zero insertion expands the frequency spectrum axis by $L$, creating un-filtered **spectral images** at frequencies $k \cdot F_{s,\text{in}} \pm f$ for $k = 1, 2, \dots, L-1$.
+- The anti-imaging filter removes these high-frequency spectral images, producing smooth, continuous band-limited time-domain samples.
+
+---
+
+### 7.3 Rational Resampling & Polyphase Filtering
+
+For arbitrary rational sampling rate conversion by ratio $\frac{F_{s,\text{out}}}{F_{s,\text{in}}} = \frac{L}{M}$ (where $L, M$ are coprime positive integers):
+
+1. **Upsample by $L$** via zero insertion.
+2. **Lowpass Filter** at cutoff $f_c = \min\left( \frac{F_{s,\text{in}}}{2}, \frac{F_{s,\text{out}}}{2} \right) = \frac{F_{s,\text{in}}}{2 \max(1, M/L)}$ with gain scaling $L$.
+3. **Downsample by $M$**.
+
+Using polyphase decomposition (`scipy.signal.resample_poly`), the single lowpass filter $H(z)$ is decomposed into $L$ parallel sub-filters, eliminating zero-multiplications and executing filtering directly at the lower sampling rate.
+
+---
+
+### 7.4 Physical vs. Normalized Digital Frequency
+
+- **Physical Frequency ($f$ in Hz):** Absolute physical oscillation rate of a signal (e.g. $500\text{ Hz}$). Physical frequencies are invariant under sampling-rate conversion.
+- **Normalized Digital Frequency ($\omega$ in rad/sample or $f_{\text{norm}}$ in cycles/sample):**
+
+  $$\omega = \frac{2\pi f}{F_s}, \quad f_{\text{norm}} = \frac{f}{F_s} \in \left[0, \frac{1}{2}\right]$$
+
+  Resampling alters the digital frequency $f_{\text{norm}}$ because $F_s$ changes, but leaves the physical frequency $f$ unchanged.
+
+---
+
+### 7.5 Common Multirate Misconceptions
+
+1. *Misconception:* "Interpolation creates new physical information."
+   - *Reality:* Interpolation generates new discrete sample points based on a band-limited reconstruction model; it does not add new physical spectral content.
+2. *Misconception:* "Zero insertion itself reconstructs the signal."
+   - *Reality:* Zero insertion creates spectral images. The lowpass anti-imaging filter performs the actual reconstruction.
+3. *Misconception:* "Decimation automatically prevents aliasing."
+   - *Reality:* Decimation only prevents aliasing if accompanied by appropriate anti-aliasing filtering before downsampling.
+4. *Misconception:* "Resampling improves signal quality."
+   - *Reality:* Resampling changes the discrete sampling grid; signal quality depends strictly on the original signal bandwidth and filter characteristics.
+
+
