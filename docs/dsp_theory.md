@@ -141,13 +141,68 @@ $$x(t) = A_c \cdot \cos\left( 2\pi f_c t + \frac{\Delta f}{f_m} \sin(2\pi f_m t)
 
 ---
 
-## 4. Frequency Validation vs. Nyquist Aliasing Policy
+## 4. Sampling Theory, Nyquist Analysis, and Aliasing (Phase 2)
 
-In `RadarDSP Lab`, a crucial architectural separation exists between **Signal Generation** and **Sampling Analysis**:
+### 4.1 Nyquist-Shannon Sampling Theorem
+The Nyquist-Shannon sampling theorem states that a continuous band-limited signal $x(t)$ with maximum frequency component $f_{\max}$ can be completely reconstructed from its discrete samples $x[n]$ if and only if the sampling frequency $F_s$ satisfies:
 
-1. **Signal Generation Policy (`src/dsp/signals.py`):**
-   The signal generator computes discrete sample evaluations $x[n] = f(n/F_s)$ for requested mathematical parameters. It enforces physical validity ($f \ge 0$, $F_s > 0$, $T > 0$, finite $A$), but does **NOT** restrict frequencies to $f < \frac{F_s}{2}$.
-2. **Sampling Analysis Policy (`src/dsp/sampling.py` - Phase 2):**
-   The evaluation of Nyquist rate ($F_{\text{Nyquist}} = 2 f_{\max}$), spectral aliasing foldover, undersampling, and signal reconstruction belongs strictly to the downstream sampling module.
+$$F_s > F_{\text{Nyquist}} = 2 \cdot f_{\max}$$
 
-This design enables explicit intentional undersampling and aliasing experiments without artificial generator errors.
+The threshold frequency $F_{\text{folding}} = \frac{F_s}{2}$ is called the **folding frequency** or **Nyquist limit**.
+
+- **Oversampled:** $F_s > 2 f_{\max}$ (No spectral overlapping).
+- **Critically Sampled:** $F_s = 2 f_{\max}$.
+- **Undersampled:** $F_s < 2 f_{\max}$ (Spectral aliasing occurs).
+
+---
+
+### 4.2 Theoretical Folded Alias Frequency Formulation
+When a sinusoidal tone of frequency $f \ge 0$ is sampled at rate $F_s > 0$, the discrete sequence $x[n] = A \sin(2\pi f \frac{n}{F_s})$ is mathematically identical to a tone at an apparent frequency $f_{\text{alias}} \in [0, F_s/2]$.
+
+Using modulo arithmetic:
+
+$$r = f \bmod F_s$$
+
+$$f_{\text{alias}} = \begin{cases} r & \text{if } r \le \frac{F_s}{2} \\ F_s - r & \text{if } r > \frac{F_s}{2} \end{cases}$$
+
+Alternatively, using symmetric integer rounding:
+
+$$f_{\text{alias}} = \left| f - F_s \cdot \text{round}\left( \frac{f}{F_s} \right) \right|$$
+
+#### Examples:
+1. $f = 100\text{ Hz}, F_s = 1000\text{ Hz} \implies r = 100 \le 500 \implies f_{\text{alias}} = 100\text{ Hz}$ (Unaliased).
+2. $f = 700\text{ Hz}, F_s = 1000\text{ Hz} \implies r = 700 > 500 \implies f_{\text{alias}} = 1000 - 700 = 300\text{ Hz}$ (Aliased).
+3. $f = 1200\text{ Hz}, F_s = 1000\text{ Hz} \implies r = 200 \le 500 \implies f_{\text{alias}} = 200\text{ Hz}$ (Aliased).
+
+---
+
+### 4.3 Measured Alias Frequency via Spectral Analysis
+To measure apparent alias frequencies empirically from a discrete sampled signal $x[n]$:
+1. Compute the discrete Real FFT magnitude spectrum $|X[k]| = \left| \text{RFFT}(x[n]) \right|$.
+2. Locate prominent magnitude peaks $k^*$.
+3. Apply sub-bin **parabolic peak interpolation** using adjacent spectral bins $(\alpha = |X[k^*-1]|, \beta = |X[k^*]|, \gamma = |X[k^*+1]|)$:
+
+$$\delta = \frac{1}{2} \frac{\alpha - \gamma}{\alpha - 2\beta + \gamma}$$
+
+$$f_{\text{measured}} = (k^* + \delta) \cdot \frac{F_s}{N}$$
+
+---
+
+### 4.4 Error Calculation Metrics
+The accuracy of the theoretical aliasing model is evaluated against empirical measurements:
+
+- **Absolute Frequency Error:**
+
+$$e_{\text{abs}} = |f_{\text{measured}} - f_{\text{theoretical}}| \quad (\text{Hz})$$
+
+- **Relative Frequency Error:**
+
+$$e_{\text{rel}} = \frac{|f_{\text{measured}} - f_{\text{theoretical}}|}{f_{\text{theoretical}}}$$
+
+- **Mean Absolute Error (MAE):**
+
+$$\text{MAE} = \frac{1}{M} \sum_{k=1}^{M} |f_{\text{measured}, k} - f_{\text{theoretical}, k}|$$
+
+- **Root Mean Square Error (RMSE):**
+
+$$\text{RMSE} = \sqrt{ \frac{1}{M} \sum_{k=1}^{M} (f_{\text{measured}, k} - f_{\text{theoretical}, k})^2 }$$

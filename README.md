@@ -14,7 +14,7 @@ A modular academic and engineering simulator for **Digital Signal Processing (DS
 
 ### 1. DSP Laboratory
 - **Signal Generation (Phase 1 Completed):** Multi-tone synthesis, sine, cosine, square, triangle, sawtooth, linear chirps, seeded Gaussian noise, AM, and FM signals.
-- **Sampling & Nyquist Theory:** Aliasing, undersampling, and signal reconstruction.
+- **Sampling & Nyquist Theory (Phase 2 Completed):** Discrete uniform sampling, Nyquist-rate analysis ($F_{\text{Nyquist}} = 2 f_{\max}$), theoretical alias frequency foldover calculation ($f_{\text{alias}} \in [0, F_s/2]$), parabolic FFT peak estimation, and quantitative error metrics (MAE/RMSE).
 - **Spectral Analysis:** FFT/DFT computation, windowing functions, and STFT spectrograms.
 - **Digital Filtering:** FIR & IIR filter design (butterworth, firwin), phase response, decimation, and interpolation.
 
@@ -37,18 +37,20 @@ RadarDSP-Lab/
 ├── app/                  # Streamlit application entry point & view modules
 ├── src/                  # Core signal processing & radar domain packages
 │   ├── dsp/              # Sampling, FFT, Filtering, STFT, Signals Engine
-│   │   └── signals.py    # Production-quality signal generation engine (Phase 1)
+│   │   ├── signals.py    # Production-quality signal generation engine (Phase 1)
+│   │   └── sampling.py   # Sampling, Nyquist rate analysis, aliasing engine (Phase 2)
 │   ├── radar/            # Chirp generation, Propagation, 2D Range-Doppler, CFAR
 │   ├── validation/       # Cramér-Rao Lower Bounds, Error metrics, Monte-Carlo sweeps
 │   └── utils/            # Pydantic configuration schemas & logging
 ├── tests/                # PyTest suite for unit and integration testing
-│   └── test_signals.py   # Comprehensive DSP signal engine test suite (Phase 1)
+│   ├── test_signals.py   # Comprehensive DSP signal engine test suite (Phase 1)
+│   └── test_sampling.py  # Sampling, Nyquist analysis, aliasing test suite (Phase 2)
 ├── matlab/               # Independent MATLAB reference implementations
 ├── configs/              # Preserved YAML parameter files
 ├── experiments/          # Saved experiment runs and benchmark visual outputs
 └── docs/                 # Architectural & mathematical documentation
     ├── architecture.md   # Architectural Specifications
-    └── dsp_theory.md     # Phase 1 Mathematical Signal Models & Theories
+    └── dsp_theory.md     # Mathematical Signal Models & Sampling Theory
 ```
 
 ---
@@ -81,7 +83,7 @@ pytest
 
 - [x] **Phase 0:** Core Clean Architecture setup, Pydantic schemas, package stubs, test suite initialization.
 - [x] **Phase 1:** Core DSP Signal Generation Engine (`src/dsp/signals.py`, 10 signal types, determinism, test suite).
-- [ ] **Phase 2:** Sampling & Nyquist-rate analysis, undersampling, aliasing prediction.
+- [x] **Phase 2:** Sampling & Nyquist-rate analysis, undersampling, aliasing calculation (`src/dsp/sampling.py`, test suite).
 - [ ] **Phase 3:** Spectral analysis (FFT/DFT, windowing, spectral leakage, STFT spectrograms).
 - [ ] **Phase 4:** Digital filtering (FIR/IIR design, decimation, interpolation, anti-aliasing).
 - [ ] **Phase 5:** FMCW Radar Laboratory (chirps, target channel, 2D Range-Doppler, CA-CFAR).
