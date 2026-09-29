@@ -92,10 +92,14 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-### 2. Run Tests
+### 2. Run Tests & Streamlit App
 
 ```bash
+# Run unit & integration test suite
 pytest
+
+# Launch interactive Streamlit application
+streamlit run app/main.py
 ```
 
 ---
@@ -113,10 +117,25 @@ pytest
 - [x] **Phase 8:** Noise, Clutter & CA-CFAR Detection Engine (`src/radar/noise.py`, `clutter.py`, `cfar.py`, 2D CA-CFAR detector, test suite).
 - [x] **Phase 9:** Scientific Validation, Error Analysis & Monte Carlo Evaluation (`src/validation/metrics.py`, `monte_carlo.py`, `experiments.py`, 159 unit tests passing, smoke test).
 - [x] **Phase 10:** MATLAB Golden Reference Implementation & Cross-Validation (`matlab/`, DSP aliasing/FFT, FMCW single-target, multi-target 2D Range-Doppler, AWGN, 2D CA-CFAR, automated cross-validation harness).
+- [x] **Phase 11:** Interactive Streamlit Laboratory UI (`app/main.py`, multi-page navigation, DSP Lab, FMCW Radar Lab, Validation Dashboard).
+
+---
+
+## 🖥️ Streamlit Interactive UI & Architecture Mapping
+
+RadarDSP Lab features a multi-page interactive Streamlit web application orchestrating the scientific core packages.
+
+| UI Laboratory Section | Interactive Views | Underlying Backend API |
+| :--- | :--- | :--- |
+| **🏠 Home Page** | Capabilities, Flow Diagram, Tech Stack | `app/views/home.py` |
+| **📡 DSP Lab** | 1. Signal Generator (10 Signal Types)<br>2. Sampling & Aliasing<br>3. FFT & Spectrum<br>4. Digital Filters (FIR/IIR)<br>5. Multirate Resampling | `src/dsp/signals.py`<br>`src/dsp/sampling.py`<br>`src/dsp/transforms.py`<br>`src/dsp/filtering.py`<br>`src/dsp/resampling.py` |
+| **🚗 FMCW Radar** | 1. Single Target Stretch-Dechirp<br>2. Multi-Target Kinematics<br>3. 2D Range-Doppler Heatmap<br>4. AWGN Noise & Clutter<br>5. 2D CA-CFAR Detection Engine | `src/radar/chirp.py`, `propagation.py`, `processing.py`<br>`src/radar/doppler.py`, `target.py`<br>`src/radar/doppler.py`<br>`src/radar/noise.py`, `clutter.py`<br>`src/radar/cfar.py` |
+| **📊 Validation** | 1. Range Accuracy (50–500m)<br>2. Velocity Accuracy (-15 to +15 m/s)<br>3. SNR Sensitivity Sweeps<br>4. False Alarm Analysis ($P_{\text{fa}}$)<br>5. Monte Carlo Evaluation (100 Trials) | `src/validation/experiments.py`<br>`src/validation/metrics.py`<br>`src/validation/monte_carlo.py` |
 
 ---
 
 ## 📊 Scientific Validation & Experiments (Phase 9)
+
 
 Phase 9 provides quantitative error analysis and stochastic Monte Carlo evaluation across the existing radar processing pipeline.
 

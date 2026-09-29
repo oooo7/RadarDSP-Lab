@@ -23,8 +23,14 @@ MODULES_TO_TEST = [
     "src.utils.config",
     "src.utils.logging",
     "app",
+    "app.main",
+    "app.views.home",
     "app.views.dsp_lab",
     "app.views.radar_lab",
+    "app.views.validation",
+    "app.components.plots",
+    "app.components.theory",
+    "app.components.metrics",
 ]
 
 
