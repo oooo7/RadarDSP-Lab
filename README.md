@@ -111,9 +111,37 @@ pytest
 - [x] **Phase 6:** FMCW Radar Range-Processing Engine (`src/radar/chirp.py`, `processing.py`, analog stretch dechirp model, beat sampling Nyquist validator, test suite).
 - [x] **Phase 7:** Multi-Target FMCW Radar + Doppler / Velocity Engine (`src/radar/doppler.py`, 2D Range-Doppler map, velocity axis, peak extraction, test suite).
 - [x] **Phase 8:** Noise, Clutter & CA-CFAR Detection Engine (`src/radar/noise.py`, `clutter.py`, `cfar.py`, 2D CA-CFAR detector, test suite).
+- [x] **Phase 9:** Scientific Validation, Error Analysis & Monte Carlo Evaluation (`src/validation/metrics.py`, `monte_carlo.py`, `experiments.py`, 159 unit tests passing, smoke test).
+
+---
+
+## 📊 Scientific Validation & Experiments (Phase 9)
+
+Phase 9 provides quantitative error analysis and stochastic Monte Carlo evaluation across the existing radar processing pipeline.
+
+### Key Experiments & Features
+1. **Range Accuracy Experiment:** Evaluates range estimation across targets [50, 100, 150, 200, 300, 400] m. Quantifies MAE (0.0300 m), RMSE (0.0336 m), and relative error.
+2. **Velocity Accuracy Experiment:** Evaluates radial velocity across [-15, -10, -5, 0, 5, 10, 15] m/s. Safe relative error handling for stationary targets ($v_{\text{true}} \approx 0$).
+3. **SNR Sensitivity Sweep:** Evaluates $P_d$ and MAE vs SNR across [30 to -5] dB.
+4. **CFAR Empirical False Alarm Rate:** Evaluates empirical $P_{\text{fa}}$ against configured $P_{\text{fa}}$ ($10^{-2}, 10^{-3}, 10^{-4}$) in noise-only and statistical clutter environments.
+5. **Multi-Target Monte Carlo Runner:** Reproducible multi-trial runner ($S_i = S_0 + 1000 i + 1$) executing 100 trials on Phase 7/8 benchmark targets ($100\%$ overall $P_d$, $0$ missed detections).
+
+### Run Phase 9 Experiment Suite
+
+```bash
+source .venv/bin/activate
+PYTHONPATH=. python experiments/smoke_test_phase9.py
+```
+
+Generated plots are saved to `experiments/`:
+- `phase9_range_accuracy.png`
+- `phase9_velocity_accuracy.png`
+- `phase9_snr_sweep.png`
+- `phase9_false_alarm.png`
 
 ---
 
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for details.
+

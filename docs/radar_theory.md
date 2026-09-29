@@ -282,6 +282,72 @@ $$P_{\text{CUT}}(d, r) > P_{\text{threshold}}(d, r)$$
 #### Boundary Handling
 CUT cells near the matrix edges where the full training/guard window extends past array boundaries are marked as **INVALID / NON-DETECTION** (`detection_mask = False`, `threshold_db = NaN`). Edge wrap-around (`np.roll`) is strictly avoided to prevent Doppler/range contamination across opposite boundaries.
 
+---
+
+## 16. Scientific Validation, Error Analysis & Monte Carlo Evaluation Engine
+
+Phase 9 establishes a scientific validation and experimentation layer designed to quantify estimation accuracy, detection probability ($P_d$), empirical false alarm rate ($P_{\text{fa}}$), SNR sensitivity, and Monte Carlo variability across RadarDSP Lab.
+
+### 16.1 Quantitative Error Metrics
+
+For a target with ground-truth range $R_{\text{true}}$ and velocity $v_{\text{true}}$, and estimated values $R_{\text{est}}$ and $v_{\text{est}}$:
+
+#### Signed Absolute Error
+$$e_R = R_{\text{est}} - R_{\text{true}} \quad (\text{m}), \qquad e_v = v_{\text{est}} - v_{\text{true}} \quad (\text{m/s})$$
+
+#### Magnitude Error
+$$|e_R| = |R_{\text{est}} - R_{\text{true}}| \quad (\text{m}), \qquad |e_v| = |v_{\text{est}} - v_{\text{true}}| \quad (\text{m/s})$$
+
+#### Relative Percentage Error
+$$\text{Error}_R(\%) = 100 \times \frac{|R_{\text{est}} - R_{\text{true}}|}{R_{\text{true}}}$$
+
+$$\text{Error}_v(\%) = 
+\begin{cases} 
+100 \times \frac{|v_{\text{est}} - v_{\text{true}}|}{|v_{\text{true}}|}, & |v_{\text{true}}| \ge 10^{-3}\text{ m/s} \\
+0.0, & |v_{\text{true}}| < 10^{-3}\text{ m/s} \quad (\text{Stationary Targets})
+\end{cases}$$
+
+#### Aggregate Statistical Summaries across $K$ Trials
+- **Mean Error:** $\bar{e} = \frac{1}{K} \sum_{i=1}^K e_i$
+- **Mean Absolute Error (MAE):** $\text{MAE} = \frac{1}{K} \sum_{i=1}^K |e_i|$
+- **Root Mean Square Error (RMSE):** $\text{RMSE} = \sqrt{\frac{1}{K} \sum_{i=1}^K e_i^2}$
+- **Standard Deviation ($\sigma$):** $\sigma = \sqrt{\frac{1}{K} \sum_{i=1}^K (e_i - \bar{e})^2}$
+- **Maximum Absolute Error:** $\text{Max}|e| = \max_i |e_i|$
+
+### 16.2 Cramér-Rao Lower Bounds (CRLB)
+
+The Cramér-Rao Lower Bound provides the theoretical minimum achievable variance for any unbiased estimator under AWGN noise at signal-to-noise ratio $\text{SNR}_{\text{linear}} = 10^{\text{SNR}_{\text{dB}}/10}$:
+
+$$\text{CRLB}_R = \frac{c}{2 B \sqrt{2 \cdot \text{SNR}_{\text{linear}}}} \quad (\text{m})$$
+
+$$\text{CRLB}_v = \frac{\lambda}{2 \pi T_{\text{frame}} \sqrt{2 \cdot \text{SNR}_{\text{linear}}}} \quad (\text{m/s})$$
+
+where $T_{\text{frame}} = M \cdot T_c$ is the coherent processing interval (CPI).
+
+### 16.3 Physical Resolution vs Estimator Accuracy
+
+It is critical to distinguish **physical resolution** from **estimator accuracy**:
+- **Physical Resolution ($\Delta R, \Delta v$):** The minimum separation required to resolve two closely spaced targets as distinct spectral peaks ($\Delta R = c / (2B), \Delta v = \lambda / (2 M T_c)$).
+- **Estimator Accuracy (MAE/RMSE):** The precision with which a single isolated target peak can be estimated using sub-bin interpolation or peak finding. High SNR can yield sub-resolution estimation accuracy ($|e_R| \ll \Delta R$), but this does NOT imply the physical resolution of the radar has changed.
+
+### 16.4 Resolution-Gated 1-to-1 Target Matching
+
+For multi-target detection, raw CFAR detection masks cannot be directly compared to ordered target lists. RadarDSP Lab implements a greedy 1-to-1 target-to-detection matching algorithm:
+1. Candidate detections are gated by physical resolution bounds:
+   $$|R_{\text{det}} - R_{\text{true}}| \le 1.5 \cdot \Delta R \quad \text{AND} \quad |v_{\text{det}} - v_{\text{true}}| \le 1.5 \cdot \Delta v$$
+2. Candidate pairs are assigned by minimizing normalized distance:
+   $$d = \sqrt{ \left( \frac{R_{\text{det}} - R_{\text{true}}}{1.5 \Delta R} \right)^2 + \left( \frac{v_{\text{det}} - v_{\text{true}}}{1.5 \Delta v} \right)^2 }$$
+3. Each detection matches at most one target (True Positive), unmatched targets are counted as Missed Detections (False Negatives), and remaining detections are counted as Spurious Alarms (False Positives).
+
+### 16.5 Reproducible Monte Carlo Methodology
+
+To guarantee exact numerical reproducibility across multi-trial simulations, trial $i$ ($0 \le i < K$) derives its random seed deterministically from master seed $S_0$:
+
+$$\text{Seed}_i = S_0 + 1000 \cdot i + 1$$
+
+This ensures that independent trials receive distinct, non-overlapping pseudo-random streams while producing identical numerical results across execution environments.
+
+
 
 
 
