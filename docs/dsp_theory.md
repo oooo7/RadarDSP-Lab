@@ -171,7 +171,7 @@ $$f_{\text{alias}} = \left| f - F_s \cdot \text{round}\left( \frac{f}{F_s} \righ
 
 ---
 
-## 5. FFT, Spectrum Analysis, Windowing & STFT (Phase 3 Audit)
+## 5. FFT, Spectrum Analysis, Windowing & STFT (Phase 3)
 
 ### 5.1 Magnitude Normalization & Coherent Gain
 For a real-valued sinusoid $x(t) = A \cos(2\pi f t + \phi)$ windowed by $w[n]$:
@@ -205,36 +205,49 @@ Multiplying interior positive bins by 2 for one-sided PSD. Measures continuous n
 
 ---
 
-### 5.3 Window Functions & Peak Sidelobe Level (PSL)
+## 6. Digital Filtering Theory & Mathematical Formulations (Phase 4)
 
-Tapering windows reduce spectral leakage by smoothing temporal discontinuities at signal boundaries:
+### 6.1 Finite Impulse Response (FIR) Filters
+An FIR filter processes input samples $x[n]$ using a finite sequence of $N_{\text{taps}}$ numerator coefficients $b[k]$ ($k = 0, \dots, M$):
 
-| Window Name | Mainlobe Width ($\text{bins}$) | Peak Sidelobe Level ($\text{PSL}_{\text{dB}}$) | Coherent Gain ($C_{\text{gain}}$) | ENBW ($\text{bins}$) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Rectangular** | $2 \cdot (F_s / N)$ | $-13.3\text{ dB}$ | $1.00$ | $1.00$ |
-| **Hann** | $4 \cdot (F_s / N)$ | $-31.5\text{ dB}$ | $0.50$ | $1.50$ |
-| **Hamming** | $4 \cdot (F_s / N)$ | $-42.7\text{ dB}$ | $0.54$ | $1.36$ |
-| **Blackman** | $6 \cdot (F_s / N)$ | $-58.1\text{ dB}$ | $0.42$ | $1.73$ |
+$$y[n] = \sum_{k=0}^{M} b[k] \cdot x[n-k]$$
 
-#### Peak Sidelobe Level (PSL) Calculation:
-To avoid misidentifying mainlobe broadening as sidelobes, `RadarDSP Lab` excludes the mainlobe region ($|k - k^*| \le 4\text{ bins}$) before computing peak sidelobe magnitude:
+Where:
+- Filter order $M = N_{\text{taps}} - 1$.
+- **Linear Phase Condition:** When coefficients are symmetric ($b[k] = b[M-k]$), the FIR filter exhibits exact linear phase, introducing a constant group delay:
 
-$$\text{PSL}_{\text{dB}} = 20 \log_{10}\left( \frac{\max_{|k - k^*| > 4} |X[k]|}{\max |X[k]|} \right)$$
+$$\tau_g = \frac{M}{2} = \frac{N_{\text{taps}} - 1}{2} \quad (\text{samples})$$
 
 ---
 
-### 5.4 Sub-Bin Parabolic Peak Frequency Interpolation
-When a tone is not aligned with an integer FFT bin, 3-point parabolic interpolation around peak bin $k^*$ estimates sub-bin frequency shift $\delta \in [-0.5, 0.5]$:
+### 6.2 Infinite Impulse Response (IIR) Butterworth Filters
+An IIR filter incorporates recursive feedback from previous output samples $y[n-k]$:
 
-$$\alpha = |X[k^*-1]|, \quad \beta = |X[k^*]|, \quad \gamma = |X[k^*+1]|$$
+$$y[n] = \sum_{k=0}^{M} b[k] \cdot x[n-k] - \sum_{k=1}^{N} a[k] \cdot y[n-k]$$
 
-$$\delta = \frac{1}{2} \frac{\alpha - \gamma}{\alpha - 2\beta + \gamma}$$
+#### Why Feedback Terms ($a[k]$) Matter:
+The presence of non-zero denominator coefficients $a[k]$ creates infinite impulse response memory, providing significantly sharper spectral transition roll-off at much lower filter orders compared to FIR filters.
 
-$$f_{\text{estimated}} = (k^* + \delta) \cdot \frac{F_s}{N_{\text{fft}}}$$
+#### Second-Order Sections (SOS) Numerical Representation:
+To avoid coefficient quantization instability in high-order IIR filters, `RadarDSP Lab` implements IIR filters as cascaded biquad Second-Order Sections (SOS):
+
+$$H(z) = g \cdot \prod_{k=1}^{L} \frac{b_{0,k} + b_{1,k} z^{-1} + b_{2,k} z^{-2}}{1 + a_{1,k} z^{-1} + a_{2,k} z^{-2}}$$
 
 ---
 
-### 5.5 Zero-Padding vs. Rayleigh Physical Resolution
-- **Physical Frequency Resolution:** $\Delta f_{\text{phys}} = \frac{F_s}{N_{\text{signal}}} = \frac{1}{T_{\text{obs}}}$
-- **FFT Bin Spacing:** $\Delta f_{\text{bin}} = \frac{F_s}{N_{\text{fft}}}$
-- Zero-padding ($N_{\text{fft}} > N_{\text{signal}}$) increases display grid density ($\Delta f_{\text{bin}}$) but does **NOT** improve fundamental physical Rayleigh resolution ($\Delta f_{\text{phys}}$).
+### 6.3 Causal vs. Zero-Phase Filtering
+
+1. **Causal Filtering (`zero_phase = False`):**
+   - Applies forward-in-time filtering (`lfilter` for FIR, `sosfilt` for IIR).
+   - Introduces physical phase shift and temporal group delay $\tau_g$.
+2. **Zero-Phase Filtering (`zero_phase = True`):**
+   - Performs two-pass forward and reverse filtering (`filtfilt` for FIR, `sosfiltfilt` for IIR SOS).
+   - Eliminates all phase distortion ($\angle H(f) = 0$), maintaining exact peak time alignment.
+   - Non-causal processing used for offline analysis.
+
+---
+
+### 6.4 -3 dB Cutoff Frequency Definition
+The -3 dB cutoff frequency $f_c$ is defined as the point where power drops by half ($50\%$), corresponding to a magnitude response attenuation of:
+
+$$|H(f_c)| = \frac{1}{\sqrt{2}} \approx 0.7071 \implies 20 \log_{10} |H(f_c)| \approx -3.01\text{ dB}$$

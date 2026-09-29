@@ -15,8 +15,8 @@ A modular academic and engineering simulator for **Digital Signal Processing (DS
 ### 1. DSP Laboratory
 - **Signal Generation (Phase 1 Completed):** Multi-tone synthesis, sine, cosine, square, triangle, sawtooth, linear chirps, seeded Gaussian noise, AM, and FM signals.
 - **Sampling & Nyquist Theory (Phase 2 Completed):** Discrete uniform sampling, Nyquist-rate analysis ($F_{\text{Nyquist}} = 2 f_{\max}$), theoretical alias frequency foldover calculation ($f_{\text{alias}} \in [0, F_s/2]$), parabolic FFT peak estimation, and quantitative error metrics (MAE/RMSE).
-- **Spectral Analysis:** FFT/DFT computation, windowing functions, and STFT spectrograms.
-- **Digital Filtering:** FIR & IIR filter design (butterworth, firwin), phase response, decimation, and interpolation.
+- **Spectral Analysis & STFT (Phase 3 Completed):** FFT/DFT computation, physical magnitude scaling, Power Spectrum ($V^2$) vs PSD ($V^2/\text{Hz}$), window functions (Rectangular, Hann, Hamming, Blackman, Kaiser), Peak Sidelobe Level (PSL), zero-padding resolution invariants, sub-bin parabolic frequency estimation, and STFT spectrogram engine.
+- **Digital Filtering (Phase 4 Completed):** FIR (lowpass, highpass, bandpass, bandstop) and IIR Butterworth filters (SOS representation), frequency response analysis, -3 dB cutoff measurement, group delay, linear phase symmetry, causal vs. zero-phase filtering.
 
 ### 2. FMCW Radar Laboratory
 - **Waveform Synthesis:** Configurable carrier frequency ($f_c$), bandwidth ($B$), chirp duration ($T_c$), and sampling rate ($f_s$).
@@ -38,19 +38,23 @@ RadarDSP-Lab/
 ├── src/                  # Core signal processing & radar domain packages
 │   ├── dsp/              # Sampling, FFT, Filtering, STFT, Signals Engine
 │   │   ├── signals.py    # Production-quality signal generation engine (Phase 1)
-│   │   └── sampling.py   # Sampling, Nyquist rate analysis, aliasing engine (Phase 2)
+│   │   ├── sampling.py   # Sampling, Nyquist rate analysis, aliasing engine (Phase 2)
+│   │   ├── transforms.py # FFT, PSD, Windowing, Parabolic Sub-bin & STFT Engine (Phase 3)
+│   │   └── filtering.py  # FIR & IIR Butterworth Digital Filtering Engine (Phase 4)
 │   ├── radar/            # Chirp generation, Propagation, 2D Range-Doppler, CFAR
 │   ├── validation/       # Cramér-Rao Lower Bounds, Error metrics, Monte-Carlo sweeps
 │   └── utils/            # Pydantic configuration schemas & logging
 ├── tests/                # PyTest suite for unit and integration testing
-│   ├── test_signals.py   # Comprehensive DSP signal engine test suite (Phase 1)
-│   └── test_sampling.py  # Sampling, Nyquist analysis, aliasing test suite (Phase 2)
+│   ├── test_signals.py   # DSP signal engine test suite (Phase 1)
+│   ├── test_sampling.py  # Sampling & aliasing test suite (Phase 2)
+│   ├── test_transforms.py# FFT, Spectral Analysis, Windowing test suite (Phase 3)
+│   └── test_filtering.py # FIR & IIR Digital Filtering test suite (Phase 4)
 ├── matlab/               # Independent MATLAB reference implementations
 ├── configs/              # Preserved YAML parameter files
 ├── experiments/          # Saved experiment runs and benchmark visual outputs
 └── docs/                 # Architectural & mathematical documentation
     ├── architecture.md   # Architectural Specifications
-    └── dsp_theory.md     # Mathematical Signal Models & Sampling Theory
+    └── dsp_theory.md     # Mathematical Signal Models, Sampling & Filtering Theory
 ```
 
 ---
@@ -84,8 +88,8 @@ pytest
 - [x] **Phase 0:** Core Clean Architecture setup, Pydantic schemas, package stubs, test suite initialization.
 - [x] **Phase 1:** Core DSP Signal Generation Engine (`src/dsp/signals.py`, 10 signal types, determinism, test suite).
 - [x] **Phase 2:** Sampling & Nyquist-rate analysis, undersampling, aliasing calculation (`src/dsp/sampling.py`, test suite).
-- [ ] **Phase 3:** Spectral analysis (FFT/DFT, windowing, spectral leakage, STFT spectrograms).
-- [ ] **Phase 4:** Digital filtering (FIR/IIR design, decimation, interpolation, anti-aliasing).
+- [x] **Phase 3:** Spectral analysis (FFT/DFT, physical scaling, windowing, PSL, STFT spectrograms, test suite).
+- [x] **Phase 4:** Digital filtering engine (`src/dsp/filtering.py`, FIR & IIR Butterworth SOS, causal/zero-phase, test suite).
 - [ ] **Phase 5:** FMCW Radar Laboratory (chirps, target channel, 2D Range-Doppler, CA-CFAR).
 - [ ] **Phase 6:** Interactive Streamlit dashboard completion and quantitative reporting exports.
 
