@@ -17,6 +17,7 @@ from app.components.plots import (
 from app.components.theory import render_theory_panel
 from src.dsp.filtering import (
     analyze_filter_response,
+    apply_filter,
     design_fir_filter,
     design_iir_butterworth,
 )
@@ -267,6 +268,16 @@ def _render_fft_spectrum() -> None:
                 + f"{df_physical:.2f} Hz` | **Zero-Padding Grid Spacing ($F_s / N_{{fft}}$):** `{df_grid:.2f} Hz`"
             )
             st.caption("Note: Zero-padding increases grid density for visual interpolation, but does NOT improve physical frequency resolution.")
+
+            # Spectrum CSV Download Button
+            df_spec = pd.DataFrame({"frequency_hz": res.frequency_hz, "magnitude_volts": res.magnitude_spectrum})
+            csv_spec = df_spec.to_csv(index=False)
+            st.download_button(
+                label="💾 Download Spectrum CSV",
+                data=csv_spec,
+                file_name="spectrum_analysis.csv",
+                mime="text/csv",
+            )
 
         except Exception as e:
             st.error(f"FFT processing error: {e}")

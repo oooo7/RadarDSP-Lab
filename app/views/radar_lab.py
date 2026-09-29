@@ -197,6 +197,15 @@ def _render_multi_target() -> None:
             if peaks:
                 df_peaks = format_detection_table(peaks)
                 st.dataframe(df_peaks, use_container_width=True)
+
+                # Radar Detection Table CSV Download Button
+                csv_det = df_peaks.to_csv(index=False)
+                st.download_button(
+                    label="💾 Download Radar Detections CSV",
+                    data=csv_det,
+                    file_name="radar_detections.csv",
+                    mime="text/csv",
+                )
             else:
                 st.info("No peaks detected above threshold.")
 
@@ -239,9 +248,11 @@ def _render_range_doppler() -> None:
 
             st.markdown(
                 r"**Range Resolution ($\Delta R$):** `"
-                + f"{rd_res.range_resolution_m:.4f} m` | **Velocity Resolution ($\Delta v$):** `{rd_res.velocity_resolution_mps:.4f} m/s` | "
+                + f"{rd_res.range_resolution_m:.4f} m` | **Velocity Resolution (" + r"$\Delta v$):** `"
+                + f"{rd_res.velocity_resolution_mps:.4f} m/s` | "
                 + r"**Max Range ($R_{{max}}$):** `"
-                + f"{rd_res.unambiguous_range_m:.1f} m` | **Max Velocity ($v_{{max}}$):** `{rd_res.unambiguous_velocity_mps:.2f} m/s`"
+                + f"{rd_res.unambiguous_range_m:.1f} m` | **Max Velocity ($v_{{max}}$):** `"
+                + f"{rd_res.unambiguous_velocity_mps:.2f} m/s`"
             )
 
         except Exception as e:
