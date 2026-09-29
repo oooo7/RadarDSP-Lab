@@ -75,9 +75,14 @@ class TargetConfig(BaseModel):
 class CFARConfig(BaseModel):
     """Configuration for Constant False Alarm Rate (CFAR) detection."""
     method: str = Field(default="CA-CFAR", description="CFAR algorithm: CA-CFAR, GO-CFAR, SO-CFAR, OS-CFAR")
-    num_guard_cells: int = Field(default=2, ge=0, description="Number of guard cells per side")
-    num_reference_cells: int = Field(default=8, ge=1, description="Number of reference cells per side")
-    pfa: float = Field(default=1e-5, gt=0, lt=1, description="Probability of False Alarm")
+    num_guard_cells: int = Field(default=2, ge=0, description="1D default guard cells per side")
+    num_reference_cells: int = Field(default=8, ge=1, description="1D default reference/training cells per side")
+    num_guard_range: int = Field(default=2, ge=0, description="Guard cells per side in Range direction")
+    num_guard_doppler: int = Field(default=2, ge=0, description="Guard cells per side in Doppler direction")
+    num_train_range: int = Field(default=4, ge=1, description="Training cells per side in Range direction")
+    num_train_doppler: int = Field(default=4, ge=1, description="Training cells per side in Doppler direction")
+    pfa: float = Field(default=1e-4, gt=0, lt=1, description="Probability of False Alarm Pfa")
+    min_threshold_floor_db: Optional[float] = Field(default=None, description="Optional minimum threshold floor in dB")
 
 
 class RadarConfig(BaseModel):

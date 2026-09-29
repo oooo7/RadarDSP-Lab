@@ -223,5 +223,65 @@ The maximum radial velocity that can be measured without Doppler phase aliasing 
 
 $$f_{D,\max} = \frac{\text{PRF}}{2} = \frac{1}{2 T_c} \implies v_{\max} = \frac{\lambda}{4 T_c} = \frac{c}{4 f_c T_c}$$
 
+---
+
+## 15. Noise, Statistical Background Clutter & CA-CFAR Detection Engine
+
+To transition the radar simulation from an ideal noiseless model to a realistic detection environment, `RadarDSP Lab` introduces complex additive noise, background clutter, and adaptive Constant False Alarm Rate (CFAR) detection.
+
+### 15.1 Additive White Gaussian Noise (AWGN) & SNR
+The complex baseband noise $w[n] = w_I[n] + j w_Q[n]$ consists of independent real and imaginary Gaussian components:
+
+$$w_I \sim \mathcal{N}\left(0, \frac{P_{\text{noise}}}{2}\right), \quad w_Q \sim \mathcal{N}\left(0, \frac{P_{\text{noise}}}{2}\right)$$
+
+Total average complex noise power is $P_{\text{noise}} = \mathbb{E}[|w|^2] = \mathbb{E}[w_I^2] + \mathbb{E}[w_Q^2]$.
+
+The Signal-to-Noise Ratio (SNR) in decibels is defined as:
+
+$$\text{SNR}_{\text{dB}} = 10 \log_{10}\left( \frac{P_{\text{signal}}}{P_{\text{noise}}} \right) = 10 \log_{10}\left( \frac{\frac{1}{N} \sum_{n=1}^N |x[n]|^2}{\frac{1}{N} \sum_{n=1}^N |w[n]|^2} \right)$$
+
+### 15.2 Statistical Background Clutter Model
+Radar clutter represents unwanted environmental reflections (e.g. ground, sea, weather). In Phase 8, background clutter is modeled as a complex Gaussian random process $c[n] = c_I[n] + j c_Q[n]$ with configurable power $P_{\text{clutter}}$. The magnitude envelope $|c[n]|$ follows a Rayleigh distribution:
+
+$$p(|c|) = \frac{2 |c|}{P_{\text{clutter}}} \exp\left(-\frac{|c|^2}{P_{\text{clutter}}}\right)$$
+
+*Scope Note:* This model provides an algorithmic statistical background baseline for CFAR validation. It does not model physical electromagnetic terrain/sea scattering.
+
+### 15.3 2D Cell-Averaging Constant False Alarm Rate (CA-CFAR) Engine
+
+A fixed power threshold cannot maintain a constant false alarm rate when background noise/clutter fluctuates spatially. CA-CFAR dynamically estimates local background power and computes an adaptive threshold.
+
+#### Window Geometry & Definitions
+For a Cell Under Test (CUT) at index $(d, r)$ in the Range-Doppler map:
+- **Cell Under Test (CUT):** The candidate cell being evaluated for target presence.
+- **Guard Cells ($G_D \times G_R$):** Immediate neighboring region surrounding the CUT. Guard cells prevent target mainlobe energy spillover from contaminating the local noise estimate.
+- **Training Cells ($T_D \times T_R$):** Outer region surrounding the guard window used to estimate background noise power.
+
+$$\text{Outer Window Size} = (2 T_D + 2 G_D + 1) \times (2 T_R + 2 G_R + 1)$$
+$$\text{Inner Window Size} = (2 G_D + 1) \times (2 G_R + 1)$$
+$$\text{Total Training Cells } N_{\text{train}} = \text{Outer Size} - \text{Inner Size}$$
+
+#### Power-Domain Processing & Threshold Factor ($\alpha$)
+CA-CFAR operates in the **power domain** ($P[d, r] = |S[d, r]|^2$). For $N_{\text{train}}$ independent Rayleigh-fading training cells and target false alarm probability $P_{\text{fa}}$, the analytical threshold factor $\alpha$ is:
+
+$$\alpha = N_{\text{train}} \cdot \left( P_{\text{fa}}^{-1 / N_{\text{train}}} - 1 \right)$$
+
+#### Local Noise Power Estimation & Detection Criterion
+The local background noise power estimate $\hat{P}_{\text{noise}}(d, r)$ is the arithmetic mean of power across all $N_{\text{train}}$ training cells:
+
+$$\hat{P}_{\text{noise}}(d, r) = \frac{1}{N_{\text{train}}} \sum_{\text{training cells}} P[i, j]$$
+
+The adaptive power threshold is:
+
+$$P_{\text{threshold}}(d, r) = \alpha \cdot \hat{P}_{\text{noise}}(d, r)$$
+
+A target detection is declared if:
+
+$$P_{\text{CUT}}(d, r) > P_{\text{threshold}}(d, r)$$
+
+#### Boundary Handling
+CUT cells near the matrix edges where the full training/guard window extends past array boundaries are marked as **INVALID / NON-DETECTION** (`detection_mask = False`, `threshold_db = NaN`). Edge wrap-around (`np.roll`) is strictly avoided to prevent Doppler/range contamination across opposite boundaries.
+
+
 
 
