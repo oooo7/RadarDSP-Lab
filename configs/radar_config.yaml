@@ -1,0 +1,23 @@
+# Default FMCW Radar Laboratory Configuration
+radar:
+  carrier_frequency_hz: 77.0e+9   # 77 GHz Automotive Radar
+  sweep_bandwidth_hz: 150.0e+6    # 150 MHz bandwidth (range res ~ 1m)
+  chirp_duration_sec: 100.0e-6    # 100 microseconds
+  sampling_rate_hz: 10.0e+6       # 10 MHz ADC sample rate
+  num_chirps: 64                  # 64 chirps per frame for Doppler processing
+  tx_power_dbm: 10.0
+  noise_figure_db: 10.0
+
+targets:
+  - range_m: 50.0
+    velocity_mps: 15.0
+    rcs_sqm: 1.0
+  - range_m: 100.0
+    velocity_mps: -10.0
+    rcs_sqm: 2.5
+
+cfar:
+  method: "CA-CFAR"
+  num_guard_cells: 2
+  num_reference_cells: 8
+  pfa: 0.00001
