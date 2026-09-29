@@ -209,6 +209,22 @@ Range-Doppler processing extracts 2D target maps using a sequential two-dimensio
 
 The output is a 2D Range-Doppler matrix $S[v, R]$ of shape $[N_{\text{doppler}}, N_{\text{range}}]$.
 
+### 13.1 Idealized Coherent 2D FFT Processing Gain
+
+For a data cube of $M$ chirps and $N$ fast-time samples, the **idealized coherent 2D FFT processing gain** is:
+
+$$\text{Processing Gain}_{\text{ideal}} = 10 \log_{10}(M \cdot N) \quad (\text{dB})$$
+
+For example, a data cube of $M = 64$ chirps and $N = 2000$ samples yields an idealized processing gain of $10 \log_{10}(128,000) \approx +51.07\text{ dB}$.
+
+#### Explicit Processing Gain Assumptions & Limitations:
+1. **Rectangular Windowing:** Assumes unwindowed fast-time and slow-time FFT processing.
+2. **Perfect Bin Alignment:** Assumes target range and velocity coincide exactly with FFT bin centers (zero straddle / scalloping loss).
+3. **Uncorrelated AWGN Noise:** Assumes complex AWGN noise is independent and identically distributed across all fast-time and slow-time samples.
+4. **Coherent Integration:** Assumes perfect phase coherence across all $M \times N$ samples.
+
+*Windowing Loss Note:* When windowing (e.g. Hann tapering) is applied in fast-time and slow-time, coherent signal gain is scaled ($0.5 \times 0.5 = 0.25$ in 2D, introducing a $6\text{ dB}$ signal power reduction), while noise variance is scaled by the noise power gain factor ($1.5$ per dimension). This introduces a net Equivalent Noise Bandwidth (ENBW) SNR processing loss of $\approx 1.76\text{ dB}$ per dimension ($3.52\text{ dB}$ total 2D windowing loss).
+
 ---
 
 ## 14. Velocity Resolution & Unambiguous Velocity Bounds
@@ -314,15 +330,23 @@ $$\text{Error}_v(\%) =
 - **Standard Deviation ($\sigma$):** $\sigma = \sqrt{\frac{1}{K} \sum_{i=1}^K (e_i - \bar{e})^2}$
 - **Maximum Absolute Error:** $\text{Max}|e| = \max_i |e_i|$
 
-### 16.2 Cramér-Rao Lower Bounds (CRLB)
+### 16.2 Theoretical Reference Limits & Cramér-Rao Bounds (CRLB)
 
-The Cramér-Rao Lower Bound provides the theoretical minimum achievable variance for any unbiased estimator under AWGN noise at signal-to-noise ratio $\text{SNR}_{\text{linear}} = 10^{\text{SNR}_{\text{dB}}/10}$:
+The formulas:
 
 $$\text{CRLB}_R = \frac{c}{2 B \sqrt{2 \cdot \text{SNR}_{\text{linear}}}} \quad (\text{m})$$
 
 $$\text{CRLB}_v = \frac{\lambda}{2 \pi T_{\text{frame}} \sqrt{2 \cdot \text{SNR}_{\text{linear}}}} \quad (\text{m/s})$$
 
-where $T_{\text{frame}} = M \cdot T_c$ is the coherent processing interval (CPI).
+where $T_{\text{frame}} = M \cdot T_c$ is the coherent processing interval (CPI), represent **idealized continuous-time theoretical reference limits** rather than exact bounds for discrete windowed estimators.
+
+#### Explicit Assumptions for Theoretical Reference Bounds:
+1. **Single Isolated Target:** Single target in un-cluttered complex AWGN noise.
+2. **Asymptotic High SNR:** High SNR assumption ($\text{SNR}_{\text{linear}} \gg 1$).
+3. **Continuous Signal Model:** Continuous-time unwindowed (rectangular window) signal representation.
+4. **No Discrete Binning / Windowing Loss:** Continuous parameter estimation without discrete FFT bin grid quantization ($\Delta R / \sqrt{12}$) or windowing taper ENBW losses.
+
+In discrete sampled systems with windowed FFT processing, discrete bin grid quantization and windowing losses modify the exact estimator variance.
 
 ### 16.3 Physical Resolution vs Estimator Accuracy
 

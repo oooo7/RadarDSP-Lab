@@ -19,7 +19,13 @@ SPEED_OF_LIGHT_M_PER_S = float(scipy.constants.c)
 
 @dataclass(frozen=True)
 class TheoreticalLimits:
-    """Immutable payload holding theoretical radar resolutions and Cramér-Rao Lower Bounds (CRLB).
+    """Immutable payload holding theoretical radar resolutions and simplified theoretical reference bounds (CRLB).
+
+    Note on Bounds:
+        The range_crlb_m and velocity_crlb_mps values represent idealized continuous-time
+        asymptotic reference bounds (CRLB) under unwindowed high-SNR AWGN assumptions. In discrete
+        sampled systems with windowed FFT processing, discrete bin grid quantization and windowing
+        losses modify the exact estimator variance.
 
     Attributes:
         range_resolution_m: Physical range resolution Delta R = c / (2*B) in meters.
@@ -28,8 +34,8 @@ class TheoreticalLimits:
         max_unambiguous_velocity_mps: Maximum unambiguous velocity v_max = lambda / (4*T_c) in m/s.
         snr_db: Signal-to-Noise Ratio in dB used for CRLB calculation.
         snr_linear: Linear Signal-to-Noise Ratio (10^(snr_db / 10)).
-        range_crlb_m: Theoretical minimum range estimation standard deviation CRLB_R in meters.
-        velocity_crlb_mps: Theoretical minimum velocity estimation standard deviation CRLB_v in m/s.
+        range_crlb_m: Theoretical reference bound for range estimation standard deviation CRLB_R in meters.
+        velocity_crlb_mps: Theoretical reference bound for velocity estimation standard deviation CRLB_v in m/s.
     """
     range_resolution_m: float
     max_unambiguous_range_m: float
@@ -134,14 +140,20 @@ class TargetMatchResult:
 
 
 def compute_theoretical_limits(config: RadarConfig, snr_db: float) -> TheoreticalLimits:
-    """Compute theoretical radar resolutions and Cramér-Rao Lower Bounds (CRLB).
+    """Compute theoretical radar resolutions and idealized reference bounds (CRLB).
 
-    Formulas:
+    Reference Formulas & Explicit Assumptions:
         Range Resolution: Delta R = c / (2 * B)
         Velocity Resolution: Delta v = lambda / (2 * M * T_c)
-        Range CRLB: CRLB_R = c / (2 * B * sqrt(2 * SNR_linear))
-        Velocity CRLB: CRLB_v = lambda / (2 * pi * T_frame * sqrt(2 * SNR_linear))
+        Range Reference Bound (CRLB): CRLB_R = c / (2 * B * sqrt(2 * SNR_linear))
+        Velocity Reference Bound (CRLB): CRLB_v = lambda / (2 * pi * T_frame * sqrt(2 * SNR_linear))
         where T_frame = M * T_c is total coherent observation time.
+
+    Explicit Assumptions for Reference Bounds:
+        1. Single isolated target in complex AWGN noise.
+        2. Asymptotic high SNR (SNR_linear >> 1).
+        3. Continuous-time, unwindowed (rectangular window) signal model.
+        4. Continuous parameter estimation without discrete FFT grid quantization or windowing losses.
 
     Args:
         config: RadarConfig baseline parameters.
