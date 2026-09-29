@@ -67,6 +67,9 @@ class TargetConfig(BaseModel):
     range_m: float = Field(..., ge=0, description="Target range in meters")
     velocity_mps: float = Field(default=0.0, description="Target radial velocity in m/s (positive = receding)")
     rcs_sqm: float = Field(default=1.0, gt=0, description="Radar Cross Section (RCS) in m^2")
+    amplitude: float = Field(default=1.0, gt=0, description="Linear reflection amplitude scale factor")
+    phase_rad: float = Field(default=0.0, description="Target reflection phase offset in radians")
+    target_id: Optional[str] = Field(default=None, description="Target identifier (e.g. 'T1')")
 
 
 class CFARConfig(BaseModel):

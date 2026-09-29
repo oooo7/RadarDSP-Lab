@@ -20,10 +20,9 @@ A modular academic and engineering simulator for **Digital Signal Processing (DS
 - **Multirate DSP & Resampling (Phase 5 Completed):** Decimation (anti-aliasing filtering + downsampling), interpolation (zero-insertion + polyphase anti-imaging filtering), rational resampling ($F_{s,\text{out}}/F_{s,\text{in}} = L/M$), polyphase rate conversion, naive vs. proper comparison, and analytical aliasing/spectral image analysis.
 
 ### 2. FMCW Radar Laboratory
-- **Waveform Synthesis:** Configurable carrier frequency ($f_c$), bandwidth ($B$), chirp duration ($T_c$), and sampling rate ($f_s$).
-- **Channel Dynamics:** Propagation delay, multi-target echoes, radial velocity, AWGN, and clutter.
-- **Signal Processing:** Beat frequency de-chirping, 1D Range FFT, and 2D Range-Doppler maps.
-- **Detection Engine:** 1D and 2D CA-CFAR adaptive thresholding.
+- **Waveform Synthesis (Phase 6 Completed):** Configurable carrier frequency ($f_c$), bandwidth ($B$), chirp duration ($T_c$), and sampling rate ($f_s$). Scientifically validated analog stretch dechirp processing architecture ($F_s > 2 f_{b,\max}$).
+- **Multi-Target Kinematics & Doppler Engine (Phase 7 Completed):** Multi-target synthesis ($R, v, A, \phi_0$), fast-time vs slow-time data cube generation ($M \times N$), 2D Range-Doppler matrix processing (2D FFT, slow-time windowing, `fftshift`), velocity axis mapping ($v = f_D \cdot \lambda / 2$), range/velocity resolution bounds, and candidate peak detection.
+- **Detection Engine:** 1D and 2D CA-CFAR adaptive thresholding (Upcoming Phase 8).
 - **Validation Suite:** Theoretical resolution limits, Cramér-Rao Lower Bounds (CRLB), and Monte-Carlo performance evaluation.
 
 ---
@@ -43,7 +42,12 @@ RadarDSP-Lab/
 │   │   ├── transforms.py # FFT, PSD, Windowing, Parabolic Sub-bin & STFT Engine (Phase 3)
 │   │   ├── filtering.py  # FIR & IIR Butterworth Digital Filtering Engine (Phase 4)
 │   │   └── resampling.py # Multirate DSP, Decimation, Interpolation & Rational Resampling (Phase 5)
-│   ├── radar/            # Chirp generation, Propagation, 2D Range-Doppler, CFAR
+│   ├── radar/            # Chirp generation, Target model, Dechirp, 2D Range-Doppler Engine
+│   │   ├── chirp.py      # FMCW chirp generation & sampling architecture validator (Phase 6)
+│   │   ├── target.py     # Stationary & moving radar target kinematics (Phase 6 & 7)
+│   │   ├── propagation.py# Round-trip delay synthesis & dechirp mixing (Phase 6 & 7)
+│   │   ├── processing.py # 1D Range FFT engine & beat sampling Nyquist validator (Phase 6)
+│   │   └── doppler.py    # Multi-chirp data cube, 2D Range-Doppler FFT engine (Phase 7)
 │   ├── validation/       # Cramér-Rao Lower Bounds, Error metrics, Monte-Carlo sweeps
 │   └── utils/            # Pydantic configuration schemas & logging
 ├── tests/                # PyTest suite for unit and integration testing
@@ -51,13 +55,17 @@ RadarDSP-Lab/
 │   ├── test_sampling.py  # Sampling & aliasing test suite (Phase 2)
 │   ├── test_transforms.py# FFT, Spectral Analysis, Windowing test suite (Phase 3)
 │   ├── test_filtering.py # FIR & IIR Digital Filtering test suite (Phase 4)
-│   └── test_resampling.py# Multirate DSP & Resampling test suite (Phase 5)
+│   ├── test_resampling.py# Multirate DSP & Resampling test suite (Phase 5)
+│   ├── test_radar_chirp.py# FMCW Chirp & sampling architecture test suite (Phase 6)
+│   ├── test_radar_processing.py# 1D Range FFT & beat sampling test suite (Phase 6)
+│   └── test_radar_doppler.py   # Multi-target 2D Range-Doppler test suite (Phase 7)
 ├── matlab/               # Independent MATLAB reference implementations
 ├── configs/              # Preserved YAML parameter files
 ├── experiments/          # Saved experiment runs and benchmark visual outputs
 └── docs/                 # Architectural & mathematical documentation
     ├── architecture.md   # Architectural Specifications
-    └── dsp_theory.md     # Mathematical Signal Models, Multirate DSP & Filtering Theory
+    ├── dsp_theory.md     # Mathematical Signal Models, Multirate DSP & Filtering Theory
+    └── radar_theory.md   # FMCW Radar Principles, Stretch Processing, 2D Range-Doppler Theory
 ```
 
 ---
@@ -94,8 +102,9 @@ pytest
 - [x] **Phase 3:** Spectral analysis (FFT/DFT, physical scaling, windowing, PSL, STFT spectrograms, test suite).
 - [x] **Phase 4:** Digital filtering engine (`src/dsp/filtering.py`, FIR & IIR Butterworth SOS, causal/zero-phase, test suite).
 - [x] **Phase 5:** Multirate DSP Engine (`src/dsp/resampling.py`, decimation, interpolation, rational resampling, test suite).
-- [ ] **Phase 6:** FMCW Radar Laboratory (chirps, target channel, 2D Range-Doppler, CA-CFAR).
-- [ ] **Phase 7:** Interactive Streamlit dashboard completion and quantitative reporting exports.
+- [x] **Phase 6:** FMCW Radar Range-Processing Engine (`src/radar/chirp.py`, `processing.py`, analog stretch dechirp model, beat sampling Nyquist validator, test suite).
+- [x] **Phase 7:** Multi-Target FMCW Radar + Doppler / Velocity Engine (`src/radar/doppler.py`, 2D Range-Doppler map, velocity axis, peak extraction, test suite).
+- [ ] **Phase 8:** CFAR Detection Engine & Clutter Modeling.
 
 ---
 
