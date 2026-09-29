@@ -112,6 +112,7 @@ pytest
 - [x] **Phase 7:** Multi-Target FMCW Radar + Doppler / Velocity Engine (`src/radar/doppler.py`, 2D Range-Doppler map, velocity axis, peak extraction, test suite).
 - [x] **Phase 8:** Noise, Clutter & CA-CFAR Detection Engine (`src/radar/noise.py`, `clutter.py`, `cfar.py`, 2D CA-CFAR detector, test suite).
 - [x] **Phase 9:** Scientific Validation, Error Analysis & Monte Carlo Evaluation (`src/validation/metrics.py`, `monte_carlo.py`, `experiments.py`, 159 unit tests passing, smoke test).
+- [x] **Phase 10:** MATLAB Golden Reference Implementation & Cross-Validation (`matlab/`, DSP aliasing/FFT, FMCW single-target, multi-target 2D Range-Doppler, AWGN, 2D CA-CFAR, automated cross-validation harness).
 
 ---
 
@@ -138,6 +139,26 @@ Generated plots are saved to `experiments/`:
 - `phase9_velocity_accuracy.png`
 - `phase9_snr_sweep.png`
 - `phase9_false_alarm.png`
+
+---
+
+## 📐 MATLAB Golden Reference & Cross-Validation (Phase 10)
+
+Phase 10 provides an independent MATLAB reference implementation for core DSP and FMCW calculations to evaluate mathematical model equivalence and numerical agreement against Python.
+
+### Features
+1. **DSP Reference (`matlab/dsp/`):** Sine generation, multitone synthesis, Nyquist foldover aliasing ($f_{\text{alias}} = |(f+F_s/2)\bmod F_s - F_s/2|$), 1D FFT magnitude scaling.
+2. **FMCW Radar Reference (`matlab/radar/`):** FMCW chirp synthesis, stretch-dechirp single target range estimation, multi-target 2D Range-Doppler FFT processing, complex AWGN noise addition, 2D CA-CFAR adaptive thresholding.
+3. **Automated Cross-Validation (`matlab/validation/cross_validate_python.m`):** Runs quantitative comparisons within physical resolution tolerances ($\Delta R = c/(2B)$, $\Delta v = \lambda/(2M T_c)$).
+
+### Run Cross-Validation
+```matlab
+% In MATLAB / Octave command prompt:
+addpath('matlab/validation');
+cross_validate_python('experiments/results/python_reference_results.json');
+```
+
+*Note: MATLAB serves as an independent golden-reference implementation for selected DSP and FMCW radar calculations. Agreement is evaluated numerically within documented tolerances rather than assumed to be bit-for-bit identical.*
 
 ---
 

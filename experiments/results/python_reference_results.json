@@ -1,0 +1,167 @@
+{
+  "dsp_aliasing": {
+    "input_frequency_hz": 700.0,
+    "sampling_rate_hz": 1000.0,
+    "expected_alias_frequency_hz": 300.0,
+    "is_aliased": true,
+    "nyquist_frequency_hz": 500.0
+  },
+  "dsp_fft": {
+    "frequency_hz": 100.0,
+    "sampling_rate_hz": 1000.0,
+    "n_samples": 1000,
+    "dominant_frequency_hz": 100.0,
+    "peak_magnitude": 1.0000000000000004,
+    "frequency_error_hz": 0.0
+  },
+  "fmcw_single_target": {
+    "carrier_frequency_hz": 77000000000.0,
+    "sweep_bandwidth_hz": 150000000.0,
+    "chirp_duration_sec": 0.0001,
+    "sampling_rate_hz": 20000000.0,
+    "chirp_slope_hz_per_sec": 1500000000000.0,
+    "targets": [
+      {
+        "true_range_m": 50.0,
+        "estimated_range_m": 49.991383537030586,
+        "theoretical_beat_frequency_hz": 500346.14279722807,
+        "measured_beat_frequency_hz": 500259.918517002,
+        "abs_error_m": 0.008616462969413874
+      },
+      {
+        "true_range_m": 100.0,
+        "estimated_range_m": 99.98295469797559,
+        "theoretical_beat_frequency_hz": 1000692.2855944561,
+        "measured_beat_frequency_hz": 1000521.7145720415,
+        "abs_error_m": 0.0170453020244139
+      },
+      {
+        "true_range_m": 150.0,
+        "estimated_range_m": 149.9749056469197,
+        "theoretical_beat_frequency_hz": 1501038.4283916843,
+        "measured_beat_frequency_hz": 1500787.31113629,
+        "abs_error_m": 0.02509435308030561
+      },
+      {
+        "true_range_m": 200.0,
+        "estimated_range_m": 199.9674378779162,
+        "theoretical_beat_frequency_hz": 2001384.5711889123,
+        "measured_beat_frequency_hz": 2001058.724545194,
+        "abs_error_m": 0.032562122083788836
+      },
+      {
+        "true_range_m": 300.0,
+        "estimated_range_m": 299.9551311353327,
+        "theoretical_beat_frequency_hz": 3002076.8567833686,
+        "measured_beat_frequency_hz": 3001627.857516009,
+        "abs_error_m": 0.04486886466730766
+      },
+      {
+        "true_range_m": 400.0,
+        "estimated_range_m": 399.94805567212643,
+        "theoretical_beat_frequency_hz": 4002769.1423778245,
+        "measured_beat_frequency_hz": 4002249.3394959895,
+        "abs_error_m": 0.05194432787357073
+      },
+      {
+        "true_range_m": 500.0,
+        "estimated_range_m": 499.9488386262382,
+        "theoretical_beat_frequency_hz": 5003461.42797228,
+        "measured_beat_frequency_hz": 5002949.460051843,
+        "abs_error_m": 0.05116137376177221
+      }
+    ]
+  },
+  "fmcw_multi_target": {
+    "range_resolution_m": 0.9993081933333333,
+    "velocity_resolution_mps": 0.6083450852272727,
+    "unambiguous_range_m": 499.65409666666665,
+    "unambiguous_velocity_mps": 19.467042727272727,
+    "targets_theoretical": [
+      {
+        "id": "T1",
+        "range_m": 50.0,
+        "velocity_mps": 10.0,
+        "amplitude": 1.0
+      },
+      {
+        "id": "T2",
+        "range_m": 120.0,
+        "velocity_mps": -5.0,
+        "amplitude": 0.7
+      },
+      {
+        "id": "T3",
+        "range_m": 200.0,
+        "velocity_mps": 0.0,
+        "amplitude": 0.5
+      }
+    ],
+    "extracted_peaks": [
+      {
+        "target_id": "T1",
+        "range_m": 49.965409666666666,
+        "velocity_mps": 9.733521363636363,
+        "magnitude_db": 0.0,
+        "range_bin": 50,
+        "doppler_bin": 48
+      },
+      {
+        "target_id": "T2",
+        "range_m": 119.9169832,
+        "velocity_mps": -4.866760681818182,
+        "magnitude_db": -2.3369344660000024,
+        "range_bin": 120,
+        "doppler_bin": 24
+      },
+      {
+        "target_id": "T3",
+        "range_m": 199.86163866666666,
+        "velocity_mps": 0.0,
+        "magnitude_db": -5.067176747146242,
+        "range_bin": 200,
+        "doppler_bin": 32
+      }
+    ]
+  },
+  "awgn_noise": {
+    "signal_power": 1.0,
+    "trials": [
+      {
+        "requested_snr_db": 20.0,
+        "measured_snr_db": 19.96908626024522,
+        "signal_power": 1.0,
+        "measured_noise_power": 0.010071435458917762
+      },
+      {
+        "requested_snr_db": 10.0,
+        "measured_snr_db": 9.96908626024522,
+        "signal_power": 1.0,
+        "measured_noise_power": 0.10071435458917763
+      },
+      {
+        "requested_snr_db": 0.0,
+        "measured_snr_db": -0.0309137397547795,
+        "signal_power": 1.0,
+        "measured_noise_power": 1.0071435458917763
+      },
+      {
+        "requested_snr_db": -10.0,
+        "measured_snr_db": -10.030913739754778,
+        "signal_power": 1.0,
+        "measured_noise_power": 10.071435458917763
+      }
+    ]
+  },
+  "ca_cfar": {
+    "pfa": 0.0001,
+    "num_training_cells": 144,
+    "alpha_multiplier": 9.511271853810094,
+    "num_detections": 1117,
+    "true_positives": 3,
+    "false_negatives": 0,
+    "false_positives": 1114,
+    "border_range": 6,
+    "border_doppler": 6
+  }
+}

@@ -371,6 +371,28 @@ $$\text{Seed}_i = S_0 + 1000 \cdot i + 1$$
 
 This ensures that independent trials receive distinct, non-overlapping pseudo-random streams while producing identical numerical results across execution environments.
 
+---
+
+## 17. Independent MATLAB Golden Reference Implementation & Cross-Validation Methodology
+
+Phase 10 introduces an independent MATLAB reference implementation for core DSP and FMCW calculations to perform numerical cross-validation against the Python implementation.
+
+### 17.1 Purpose & Scientific Scope
+The objective is NOT to duplicate the full Python framework, but to independently formulate selected core mathematical models in MATLAB and verify agreement within documented physical tolerances.
+
+The cross-validation pipeline operates as:
+$$\text{Python Implementation} \longrightarrow \text{Independent Math Model} \longrightarrow \text{MATLAB Reference} \longrightarrow \text{Numerical Cross-Validation} \longrightarrow \text{Documented Tolerances}$$
+
+### 17.2 Mathematical Equivalence vs Bit-for-Bit Reproducibility
+- **Mathematical Equivalence:** Formulating identical underlying physical models (e.g. stretch-dechirp beat frequency $f_b = 2 S R / c$, Doppler shift $f_D = 2 v / \lambda$, CA-CFAR multiplier $\alpha = N(P_{\text{fa}}^{-1/N}-1)$).
+- **Numerical Agreement:** Comparing calculated quantities within physical resolution tolerances ($\Delta R = c/(2B)$, $\Delta v = \lambda/(2 M T_c)$). Bit-for-bit identity is NOT claimed due to differences in floating-point libraries (FFTW vs NumPy/SciPy FFT implementations) and pseudo-random sequence generators.
+
+### 17.3 Executed vs Implemented Status
+When running in environments where MATLAB/Octave CLI is unavailable, the repository clearly distinguishes:
+- **Implemented:** All MATLAB mathematical reference routines (`matlab/dsp/`, `matlab/radar/`, `matlab/validation/`) exist and are syntactically and mathematically verified.
+- **Executed at Runtime:** Reported as unavailable when the MATLAB binary is absent from the host system environment.
+
+
 
 
 
