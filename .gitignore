@@ -38,6 +38,10 @@ env/
 .coverage
 htmlcov/
 
+# Streamlit
+.streamlit/secrets.toml
+
 # Output Data & Experiments
 experiments/*.png
 experiments/*.csv
+

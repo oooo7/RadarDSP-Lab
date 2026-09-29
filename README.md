@@ -76,7 +76,7 @@ RadarDSP-Lab/
 
 ---
 
-## 🚀 Quick Start & Installation
+## 🚀 Quick Start & Run Locally
 
 ### 1. Clone & Setup Environment
 
@@ -88,19 +88,36 @@ cd RadarDSP-Lab
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies in editable mode
-pip install -e .
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### 2. Run Tests & Streamlit App
+### 2. Run Test Suite & Launch Streamlit App
 
 ```bash
-# Run unit & integration test suite
-pytest
+# Run complete test suite (171 tests)
+pytest -q
 
-# Launch interactive Streamlit application
+# Launch local Streamlit application
 streamlit run app/main.py
 ```
+
+Open your browser at `http://localhost:8501`.
+
+---
+
+## 🌐 Public Deployment (Streamlit Community Cloud)
+
+RadarDSP-Lab is fully configured for zero-setup cloud deployment on **Streamlit Community Cloud**:
+
+1. **Push Repository:** Ensure all changes are committed and pushed to your public GitHub repository.
+2. **Access Streamlit Cloud:** Navigate to [share.streamlit.io](https://share.streamlit.io) and log in with your GitHub account.
+3. **Create New App:** Click **"New app"** and authorize Streamlit to access your GitHub repositories.
+4. **Configure Settings:**
+   - **Repository:** `oooo7/RadarDSP-Lab` (or your repository fork)
+   - **Branch:** `main`
+   - **Main file path:** `app/main.py`
+5. **Deploy:** Click **"Deploy!"**. Streamlit will automatically install dependencies from `requirements.txt` and launch the application.
 
 ---
 
