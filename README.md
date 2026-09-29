@@ -13,7 +13,7 @@ A modular academic and engineering simulator for **Digital Signal Processing (DS
 `RadarDSP Lab` contains two primary laboratory environments:
 
 ### 1. DSP Laboratory
-- **Signal Generation:** Multi-tone synthesis, chirps, square waves, and noise injection.
+- **Signal Generation (Phase 1 Completed):** Multi-tone synthesis, sine, cosine, square, triangle, sawtooth, linear chirps, seeded Gaussian noise, AM, and FM signals.
 - **Sampling & Nyquist Theory:** Aliasing, undersampling, and signal reconstruction.
 - **Spectral Analysis:** FFT/DFT computation, windowing functions, and STFT spectrograms.
 - **Digital Filtering:** FIR & IIR filter design (butterworth, firwin), phase response, decimation, and interpolation.
@@ -36,15 +36,19 @@ RadarDSP-Lab/
 ├── pyproject.toml
 ├── app/                  # Streamlit application entry point & view modules
 ├── src/                  # Core signal processing & radar domain packages
-│   ├── dsp/              # Sampling, FFT, Filtering, STFT
+│   ├── dsp/              # Sampling, FFT, Filtering, STFT, Signals Engine
+│   │   └── signals.py    # Production-quality signal generation engine (Phase 1)
 │   ├── radar/            # Chirp generation, Propagation, 2D Range-Doppler, CFAR
 │   ├── validation/       # Cramér-Rao Lower Bounds, Error metrics, Monte-Carlo sweeps
 │   └── utils/            # Pydantic configuration schemas & logging
 ├── tests/                # PyTest suite for unit and integration testing
+│   └── test_signals.py   # Comprehensive DSP signal engine test suite (Phase 1)
 ├── matlab/               # Independent MATLAB reference implementations
 ├── configs/              # Preserved YAML parameter files
 ├── experiments/          # Saved experiment runs and benchmark visual outputs
-└── docs/                 # Architectural specifications (architecture.md)
+└── docs/                 # Architectural & mathematical documentation
+    ├── architecture.md   # Architectural Specifications
+    └── dsp_theory.md     # Phase 1 Mathematical Signal Models & Theories
 ```
 
 ---
@@ -54,7 +58,7 @@ RadarDSP-Lab/
 ### 1. Clone & Setup Environment
 
 ```bash
-git clone https://github.com/your-username/RadarDSP-Lab.git
+git clone https://github.com/oooo7/RadarDSP-Lab.git
 cd RadarDSP-Lab
 
 # Create and activate virtual environment
@@ -71,30 +75,17 @@ pip install -e .
 pytest
 ```
 
-### 3. Launch Interactive Application
-
-```bash
-streamlit run app/main.py
-```
-
----
-
-## 🧪 Testing & Validation Strategy
-
-The project employs a three-tier validation strategy:
-1. **PyTest Suite:** Validates mathematical invariants (Parseval's theorem, zero-phase response, Pydantic bounds).
-2. **Theoretical Closed-Form Verification:** Benchmarks measured range/doppler estimates against analytical CRLB limits.
-3. **MATLAB Golden Reference:** Cross-validates Python outputs against independent MATLAB Phased Array reference scripts.
-
 ---
 
 ## 📜 Development Roadmap
 
 - [x] **Phase 0:** Core Clean Architecture setup, Pydantic schemas, package stubs, test suite initialization.
-- [ ] **Phase 1:** Core DSP Laboratory implementation (signals, sampling, FFT, windowing, FIR/IIR, STFT).
-- [ ] **Phase 2:** FMCW Radar Laboratory implementation (chirps, target channel, 2D Range-Doppler, CA-CFAR).
-- [ ] **Phase 3:** Validation suite, Monte-Carlo simulations, and MATLAB cross-verification.
-- [ ] **Phase 4:** Interactive Streamlit dashboard completion and quantitative reporting exports.
+- [x] **Phase 1:** Core DSP Signal Generation Engine (`src/dsp/signals.py`, 10 signal types, determinism, test suite).
+- [ ] **Phase 2:** Sampling & Nyquist-rate analysis, undersampling, aliasing prediction.
+- [ ] **Phase 3:** Spectral analysis (FFT/DFT, windowing, spectral leakage, STFT spectrograms).
+- [ ] **Phase 4:** Digital filtering (FIR/IIR design, decimation, interpolation, anti-aliasing).
+- [ ] **Phase 5:** FMCW Radar Laboratory (chirps, target channel, 2D Range-Doppler, CA-CFAR).
+- [ ] **Phase 6:** Interactive Streamlit dashboard completion and quantitative reporting exports.
 
 ---
 

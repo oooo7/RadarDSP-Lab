@@ -11,12 +11,45 @@ from pydantic import BaseModel, Field
 
 class SignalGenConfig(BaseModel):
     """Configuration for DSP signal generation."""
-    signal_type: str = Field(default="sine", description="Type of signal: sine, cosine, chirp, square, multi_tone")
-    frequencies_hz: List[float] = Field(default_factory=lambda: [100.0], description="Tone frequencies in Hz")
-    amplitudes: List[float] = Field(default_factory=lambda: [1.0], description="Amplitudes for each tone")
-    phases_rad: List[float] = Field(default_factory=lambda: [0.0], description="Phase offsets in radians")
-    sampling_rate_hz: float = Field(default=1000.0, gt=0, description="Sampling rate fs in Hz")
+    signal_type: str = Field(
+        default="sine",
+        description="Type of signal: sine, cosine, square, triangle, sawtooth, multi_tone, chirp, noise, am, fm"
+    )
+    amplitude: float = Field(default=1.0, description="Peak signal amplitude")
+    frequency_hz: float = Field(default=100.0, description="Fundamental frequency in Hz")
+    phase_rad: float = Field(default=0.0, description="Initial phase offset in radians")
+    sampling_rate_hz: float = Field(default=1000.0, gt=0, description="Sampling frequency Fs in Hz")
     duration_sec: float = Field(default=1.0, gt=0, description="Signal duration in seconds")
+    dc_offset: float = Field(default=0.0, description="DC bias offset")
+    duty_cycle: float = Field(default=0.5, description="Duty cycle for square wave (0 to 1)")
+
+    # Multi-tone parameters
+    frequencies_hz: List[float] = Field(
+        default_factory=lambda: [100.0],
+        description="Tone frequencies in Hz for multi-tone signal"
+    )
+    amplitudes: List[float] = Field(
+        default_factory=lambda: [1.0],
+        description="Amplitudes for each tone in multi-tone signal"
+    )
+    phases_rad: List[float] = Field(
+        default_factory=lambda: [0.0],
+        description="Phase offsets in radians for each tone in multi-tone signal"
+    )
+
+    # Chirp parameters
+    f_start_hz: float = Field(default=0.0, description="Chirp start frequency in Hz")
+    f_end_hz: float = Field(default=500.0, description="Chirp end frequency in Hz")
+
+    # AM / FM parameters
+    carrier_frequency_hz: float = Field(default=100.0, description="Carrier frequency in Hz")
+    modulation_frequency_hz: float = Field(default=10.0, description="Modulating signal frequency in Hz")
+    modulation_index: float = Field(default=0.5, description="AM modulation index m")
+    frequency_deviation_hz: float = Field(default=25.0, description="FM frequency deviation delta_f in Hz")
+
+    # Noise parameters
+    std_dev: float = Field(default=1.0, description="Standard deviation for Gaussian noise")
+    seed: Optional[int] = Field(default=None, description="Random seed for deterministic noise generation")
     snr_db: Optional[float] = Field(default=None, description="Signal-to-Noise ratio in dB (None for clean signal)")
 
 
