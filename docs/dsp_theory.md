@@ -247,7 +247,23 @@ $$H(z) = g \cdot \prod_{k=1}^{L} \frac{b_{0,k} + b_{1,k} z^{-1} + b_{2,k} z^{-2}
 
 ---
 
-### 6.4 -3 dB Cutoff Frequency Definition
+### 6.4 -3 dB Cutoff Frequency Definition & Design Parameter Conventions
 The -3 dB cutoff frequency $f_c$ is defined as the point where power drops by half ($50\%$), corresponding to a magnitude response attenuation of:
 
 $$|H(f_c)| = \frac{1}{\sqrt{2}} \approx 0.7071 \implies 20 \log_{10} |H(f_c)| \approx -3.01\text{ dB}$$
+
+- **IIR Butterworth Filters:** The design parameter `cutoff_hz` directly specifies the physical $-3.01\text{ dB}$ cutoff point ($|H(f_c)| = 0.7071$).
+- **FIR Filters (`scipy.signal.firwin`):** The design cutoff parameter `cutoff_hz` specifies the $-6.01\text{ dB}$ transition midpoint ($|H(f_c)| = 0.50$). Consequently, the measured $-3\text{ dB}$ point of the finite impulse response occurs slightly prior to `cutoff_hz` (e.g. $937.0\text{ Hz}$ for an order 64 Hamming lowpass with $f_c = 1000\text{ Hz}$).
+
+---
+
+### 6.5 Zero-Phase Magnitude Squaring & Boundary Transient Spectral Floor
+
+1. **Magnitude Response Squaring:**
+   In zero-phase filtering (`filtfilt`/`sosfiltfilt`), the filter is applied forward and then backward. The effective transfer function is $H_{\text{zpf}}(z) = H(z) \cdot H^*(1/z^*)$, yielding a magnitude response of:
+
+   $$|H_{\text{zpf}}(f)| = |H(f)|^2 \implies \text{Attenuation}_{\text{zpf,dB}}(f) = 2 \cdot \text{Attenuation}_{\text{causal,dB}}(f)$$
+
+2. **Boundary Transient Spectral Floor:**
+   Because zero-phase filtering uses finite signal padding at the signal boundaries, boundary transients of strong passband tones create a dynamic spectral leakage floor ($\sim -75\text{ dB}$ to $-83\text{ dB}$) when performing uncropped FFTs on finite duration buffers where theoretical stopband attenuation exceeds $-100\text{ dB}$. Steady-state causal filtering on cropped signals matches theoretical `freqz`/`sosfreqz` curves to full machine precision.
+

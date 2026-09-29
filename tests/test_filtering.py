@@ -244,3 +244,108 @@ def test_compare_fir_vs_iir_summary() -> None:
     assert "iir_design" in cmp_res
     assert isinstance(cmp_res["fir_design"], FilterDesignResult)
     assert isinstance(cmp_res["iir_design"], FilterDesignResult)
+
+
+def test_butterworth_direct_response_and_time_domain_match() -> None:
+    """Test 15 (Audit): Verify 6th-order Butterworth sosfreqz response matches steady-state time-domain FFT filtering."""
+    fs = 10000.0
+    fc = 1000.0
+    duration = 2.0
+    iir_filt = design_iir_butterworth("lowpass", cutoff_hz=fc, order=6, sampling_rate_hz=fs)
+    resp = analyze_filter_response(iir_filt, n_points=10000)
+
+    # Theoretical values from sosfreqz
+    idx_500_th = int(np.argmin(np.abs(resp.frequency_hz - 500.0)))
+    idx_1000_th = int(np.argmin(np.abs(resp.frequency_hz - 1000.0)))
+    idx_3000_th = int(np.argmin(np.abs(resp.frequency_hz - 3000.0)))
+
+    th_mag_500 = resp.magnitude[idx_500_th]
+    th_mag_1000 = resp.magnitude[idx_1000_th]
+    th_mag_3000 = resp.magnitude[idx_3000_th]
+
+    # Verify 1000 Hz is approx -3.01 dB (0.70710678)
+    assert th_mag_1000 == pytest.approx(1.0 / np.sqrt(2.0), abs=1e-3)
+    assert 20.0 * np.log10(th_mag_1000) == pytest.approx(-3.0103, abs=0.01)
+
+    # Time domain test
+    sig = generate_multitone(frequencies_hz=[500.0, 3000.0], amplitudes=[1.0, 1.0], phases_rad=[0.0, 0.0], sampling_rate_hz=fs, duration_sec=duration)
+    iir_out = apply_filter(sig, iir_filt, zero_phase=False)
+
+    crop = int(0.2 * fs)
+    spec = compute_fft(iir_out.amplitude[crop:], sampling_rate_hz=fs, window_type="rect", one_sided=True)
+
+    idx_500 = int(np.round(500.0 / spec.bin_resolution_hz))
+    idx_3000 = int(np.round(3000.0 / spec.bin_resolution_hz))
+
+    meas_mag_500 = spec.magnitude[idx_500]
+    meas_mag_3000 = spec.magnitude[idx_3000]
+
+    # Exact match between theoretical sosfreqz and measured FFT
+    assert meas_mag_500 == pytest.approx(th_mag_500, abs=1e-5)
+    assert meas_mag_3000 == pytest.approx(th_mag_3000, abs=1e-6)
+    assert 20.0 * np.log10(meas_mag_3000) == pytest.approx(-75.24, abs=0.1)
+
+
+def test_fir_direct_response_and_time_domain_match() -> None:
+    """Test 16 (Audit): Verify order 64 Hamming FIR freqz response matches steady-state time-domain FFT filtering."""
+    fs = 10000.0
+    fc = 1000.0
+    duration = 2.0
+    fir_filt = design_fir_filter("lowpass", cutoff_hz=fc, order=64, sampling_rate_hz=fs, window_type="hamming")
+    resp = analyze_filter_response(fir_filt, n_points=10000)
+
+    idx_500_th = int(np.argmin(np.abs(resp.frequency_hz - 500.0)))
+    idx_1000_th = int(np.argmin(np.abs(resp.frequency_hz - 1000.0)))
+    idx_3000_th = int(np.argmin(np.abs(resp.frequency_hz - 3000.0)))
+
+    th_mag_500 = resp.magnitude[idx_500_th]
+    th_mag_1000 = resp.magnitude[idx_1000_th]
+    th_mag_3000 = resp.magnitude[idx_3000_th]
+
+    # Verify firwin places design cutoff fc=1000 Hz at -6 dB (0.5006)
+    assert th_mag_1000 == pytest.approx(0.5006, abs=1e-3)
+    assert 20.0 * np.log10(th_mag_1000) == pytest.approx(-6.01, abs=0.05)
+
+    # Time domain test
+    sig = generate_multitone(frequencies_hz=[500.0, 3000.0], amplitudes=[1.0, 1.0], phases_rad=[0.0, 0.0], sampling_rate_hz=fs, duration_sec=duration)
+    fir_out = apply_filter(sig, fir_filt, zero_phase=False)
+
+    crop = int(0.2 * fs)
+    spec = compute_fft(fir_out.amplitude[crop:], sampling_rate_hz=fs, window_type="rect", one_sided=True)
+
+    idx_500 = int(np.round(500.0 / spec.bin_resolution_hz))
+    idx_3000 = int(np.round(3000.0 / spec.bin_resolution_hz))
+
+    meas_mag_500 = spec.magnitude[idx_500]
+    meas_mag_3000 = spec.magnitude[idx_3000]
+
+    assert meas_mag_500 == pytest.approx(th_mag_500, abs=1e-5)
+    assert meas_mag_3000 == pytest.approx(th_mag_3000, abs=1e-6)
+    assert 20.0 * np.log10(meas_mag_3000) == pytest.approx(-59.49, abs=0.1)
+
+
+def test_causal_vs_zerophase_response_squaring() -> None:
+    """Test 17 (Audit): Verify zero-phase filtering squares magnitude response |H_zpf(f)| = |H(f)|^2."""
+    fs = 10000.0
+    fc = 1000.0
+    duration = 2.0
+
+    sig_500 = generate_sine(amplitude=1.0, frequency_hz=500.0, phase_rad=0.0, sampling_rate_hz=fs, duration_sec=duration)
+    iir_filt = design_iir_butterworth("lowpass", cutoff_hz=fc, order=6, sampling_rate_hz=fs)
+
+    c_out = apply_filter(sig_500, iir_filt, zero_phase=False)
+    zp_out = apply_filter(sig_500, iir_filt, zero_phase=True)
+
+    crop = int(0.2 * fs)
+    spec_c = compute_fft(c_out.amplitude[crop:], sampling_rate_hz=fs, window_type="rect", one_sided=True)
+    spec_zp = compute_fft(zp_out.amplitude[crop:-crop], sampling_rate_hz=fs, window_type="rect", one_sided=True)
+
+    idx_c = int(np.round(500.0 / spec_c.bin_resolution_hz))
+    idx_zp = int(np.round(500.0 / spec_zp.bin_resolution_hz))
+
+    mag_c = spec_c.magnitude[idx_c]
+    mag_zp = spec_zp.magnitude[idx_zp]
+
+    # Zero phase linear magnitude is mag_c^2
+    assert mag_zp == pytest.approx(mag_c**2, abs=1e-5)
+
