@@ -169,40 +169,72 @@ Alternatively, using symmetric integer rounding:
 
 $$f_{\text{alias}} = \left| f - F_s \cdot \text{round}\left( \frac{f}{F_s} \right) \right|$$
 
-#### Examples:
-1. $f = 100\text{ Hz}, F_s = 1000\text{ Hz} \implies r = 100 \le 500 \implies f_{\text{alias}} = 100\text{ Hz}$ (Unaliased).
-2. $f = 700\text{ Hz}, F_s = 1000\text{ Hz} \implies r = 700 > 500 \implies f_{\text{alias}} = 1000 - 700 = 300\text{ Hz}$ (Aliased).
-3. $f = 1200\text{ Hz}, F_s = 1000\text{ Hz} \implies r = 200 \le 500 \implies f_{\text{alias}} = 200\text{ Hz}$ (Aliased).
+---
+
+## 5. FFT, Spectrum Analysis, Windowing & STFT (Phase 3 Audit)
+
+### 5.1 Magnitude Normalization & Coherent Gain
+For a real-valued sinusoid $x(t) = A \cos(2\pi f t + \phi)$ windowed by $w[n]$:
+
+$$\text{Sum of Weights: } W_{\text{sum}} = \sum_{n=0}^{N_{\text{signal}}-1} w[n]$$
+
+$$\text{Coherent Gain: } C_{\text{gain}} = \frac{W_{\text{sum}}}{N_{\text{signal}}} = \text{mean}(w[n])$$
+
+#### One-Sided Magnitude Spectrum $M[k]$ Scaling Rules:
+- **DC Bin ($k = 0$):** $M[0] = \frac{|X[0]|}{W_{\text{sum}}}$
+- **Nyquist Bin ($k = N_{\text{fft}}/2$ for even $N_{\text{fft}}$):** $M[N_{\text{fft}}/2] = \frac{|X[N_{\text{fft}}/2]|}{W_{\text{sum}}}$
+- **Interior Positive Frequency Bins ($1 \le k < \lfloor(N_{\text{fft}}+1)/2\rfloor$):** $M[k] = 2 \cdot \frac{|X[k]|}{W_{\text{sum}}}$
+
+This normalization correctly recovers true physical peak sinusoidal amplitude $A$ for bin-centered tones across all window functions.
 
 ---
 
-### 4.3 Measured Alias Frequency via Spectral Analysis
-To measure apparent alias frequencies empirically from a discrete sampled signal $x[n]$:
-1. Compute the discrete Real FFT magnitude spectrum $|X[k]| = \left| \text{RFFT}(x[n]) \right|$.
-2. Locate prominent magnitude peaks $k^*$.
-3. Apply sub-bin **parabolic peak interpolation** using adjacent spectral bins $(\alpha = |X[k^*-1]|, \beta = |X[k^*]|, \gamma = |X[k^*+1]|)$:
+### 5.2 Power Spectrum vs. Power Spectral Density (PSD)
+
+- **Power Spectrum ($P[k]$ in $\text{V}^2$):**
+
+$$P[k] = (M[k])^2$$
+
+Measures discrete tone power per bin. For a real sinusoid $A \cos(2\pi f t)$, the peak power is $A^2$.
+
+- **Power Spectral Density ($\text{PSD}[k]$ in $\text{V}^2/\text{Hz}$):**
+
+$$\text{PSD}[k] = \frac{|X[k]|^2}{F_s \sum_{n=0}^{N-1} w[n]^2}$$
+
+Multiplying interior positive bins by 2 for one-sided PSD. Measures continuous noise power density per unit frequency bandwidth.
+
+---
+
+### 5.3 Window Functions & Peak Sidelobe Level (PSL)
+
+Tapering windows reduce spectral leakage by smoothing temporal discontinuities at signal boundaries:
+
+| Window Name | Mainlobe Width ($\text{bins}$) | Peak Sidelobe Level ($\text{PSL}_{\text{dB}}$) | Coherent Gain ($C_{\text{gain}}$) | ENBW ($\text{bins}$) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Rectangular** | $2 \cdot (F_s / N)$ | $-13.3\text{ dB}$ | $1.00$ | $1.00$ |
+| **Hann** | $4 \cdot (F_s / N)$ | $-31.5\text{ dB}$ | $0.50$ | $1.50$ |
+| **Hamming** | $4 \cdot (F_s / N)$ | $-42.7\text{ dB}$ | $0.54$ | $1.36$ |
+| **Blackman** | $6 \cdot (F_s / N)$ | $-58.1\text{ dB}$ | $0.42$ | $1.73$ |
+
+#### Peak Sidelobe Level (PSL) Calculation:
+To avoid misidentifying mainlobe broadening as sidelobes, `RadarDSP Lab` excludes the mainlobe region ($|k - k^*| \le 4\text{ bins}$) before computing peak sidelobe magnitude:
+
+$$\text{PSL}_{\text{dB}} = 20 \log_{10}\left( \frac{\max_{|k - k^*| > 4} |X[k]|}{\max |X[k]|} \right)$$
+
+---
+
+### 5.4 Sub-Bin Parabolic Peak Frequency Interpolation
+When a tone is not aligned with an integer FFT bin, 3-point parabolic interpolation around peak bin $k^*$ estimates sub-bin frequency shift $\delta \in [-0.5, 0.5]$:
+
+$$\alpha = |X[k^*-1]|, \quad \beta = |X[k^*]|, \quad \gamma = |X[k^*+1]|$$
 
 $$\delta = \frac{1}{2} \frac{\alpha - \gamma}{\alpha - 2\beta + \gamma}$$
 
-$$f_{\text{measured}} = (k^* + \delta) \cdot \frac{F_s}{N}$$
+$$f_{\text{estimated}} = (k^* + \delta) \cdot \frac{F_s}{N_{\text{fft}}}$$
 
 ---
 
-### 4.4 Error Calculation Metrics
-The accuracy of the theoretical aliasing model is evaluated against empirical measurements:
-
-- **Absolute Frequency Error:**
-
-$$e_{\text{abs}} = |f_{\text{measured}} - f_{\text{theoretical}}| \quad (\text{Hz})$$
-
-- **Relative Frequency Error:**
-
-$$e_{\text{rel}} = \frac{|f_{\text{measured}} - f_{\text{theoretical}}|}{f_{\text{theoretical}}}$$
-
-- **Mean Absolute Error (MAE):**
-
-$$\text{MAE} = \frac{1}{M} \sum_{k=1}^{M} |f_{\text{measured}, k} - f_{\text{theoretical}, k}|$$
-
-- **Root Mean Square Error (RMSE):**
-
-$$\text{RMSE} = \sqrt{ \frac{1}{M} \sum_{k=1}^{M} (f_{\text{measured}, k} - f_{\text{theoretical}, k})^2 }$$
+### 5.5 Zero-Padding vs. Rayleigh Physical Resolution
+- **Physical Frequency Resolution:** $\Delta f_{\text{phys}} = \frac{F_s}{N_{\text{signal}}} = \frac{1}{T_{\text{obs}}}$
+- **FFT Bin Spacing:** $\Delta f_{\text{bin}} = \frac{F_s}{N_{\text{fft}}}$
+- Zero-padding ($N_{\text{fft}} > N_{\text{signal}}$) increases display grid density ($\Delta f_{\text{bin}}$) but does **NOT** improve fundamental physical Rayleigh resolution ($\Delta f_{\text{phys}}$).

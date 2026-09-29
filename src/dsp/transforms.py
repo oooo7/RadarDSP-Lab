@@ -2,11 +2,11 @@
 
 Provides reusable, numerically accurate frequency-domain processing including:
 - FFT, rFFT, iFFT, FFT shifting
-- Physically normalized magnitude and power spectra (one-sided & two-sided)
+- Physically normalized magnitude, power spectrum (V^2), and Power Spectral Density (PSD in V^2/Hz)
 - Window functions (Rectangular, Hann, Hamming, Blackman, Kaiser) with coherent gain & ENBW
 - Parabolic sub-bin dominant frequency estimation
 - Zero-padding & resolution analysis (distinguishing physical resolution from bin density)
-- Multi-window spectral leakage analysis
+- Multi-window spectral leakage & Peak Sidelobe Level (PSL) analysis
 - Short-Time Fourier Transform (STFT) / Spectrogram engine
 """
 
@@ -34,6 +34,7 @@ class SpectrumResult:
     frequency_hz: np.ndarray
     magnitude: np.ndarray
     power: np.ndarray
+    psd: np.ndarray
     phase_rad: np.ndarray
     complex_spectrum: np.ndarray
     sampling_frequency_hz: float
@@ -88,6 +89,7 @@ class SpectralLeakageResult:
     is_bin_centered: bool
     window_spectra: Dict[str, SpectrumResult]
     peak_magnitudes: Dict[str, float]
+    peak_sidelobe_level_db: Dict[str, float]
     sidelobe_suppression_db: Dict[str, float]
 
 
@@ -133,7 +135,7 @@ def get_window(
     """Generate normalized window coefficients and calculate coherent gain and ENBW metrics.
 
     Coherent Gain (C_gain):
-        C_gain = (1 / N) * sum(w[n])
+        C_gain = (1 / N) * sum(w[n]) = mean(w[n])
 
     Equivalent Noise Bandwidth (ENBW in bins):
         ENBW = N * sum(w[n]^2) / (sum(w[n]))^2
@@ -227,9 +229,13 @@ def compute_fft(
 
     Magnitude Normalization:
         - For a real sinusoid x[n] = A * cos(2*pi*f*t + phase), the one-sided magnitude
-          spectrum peak correctly recovers amplitude A at the fundamental frequency bin.
+          spectrum peak correctly recovers peak amplitude A at the fundamental frequency bin.
         - DC bin (bin 0) and Nyquist bin (bin N/2 for even N) are scaled by 1 / sum(w[n]).
         - Interior positive frequency bins are scaled by 2 / sum(w[n]).
+
+    Power Spectrum vs PSD:
+        - Power Spectrum P[k] = (Magnitude[k])^2 in V^2 per bin.
+        - Power Spectral Density PSD[k] = |X[k]|^2 / (Fs * sum(w[n]^2)) in V^2 / Hz.
 
     Resolution Distinction:
         - Physical resolution: Delta f_phys = Fs / N_signal (determined by observation time T_obs).
@@ -244,7 +250,7 @@ def compute_fft(
         kaiser_beta: Shape parameter for Kaiser window.
 
     Returns:
-        SpectrumResult container holding frequencies, magnitude, power, phase, and metrics.
+        SpectrumResult container holding frequencies, magnitude, power, PSD, phase, and metrics.
 
     Raises:
         ValueError: If inputs are invalid or non-finite.
@@ -281,23 +287,33 @@ def compute_fft(
 
     is_real_input = not np.iscomplexobj(x)
 
+    # Scaling denominators
+    sum_w = win_metrics.sum_w if win_metrics.sum_w > 0 else 1.0
+    sum_w2 = win_metrics.sum_w2 if win_metrics.sum_w2 > 0 else 1.0
+
     if one_sided and is_real_input:
         # One-sided spectrum for real inputs [0, Fs/2]
         num_bins = (n_points // 2) + 1
         complex_spec = complex_fft[:num_bins]
         freqs = np.fft.rfftfreq(n_points, d=1.0 / fs)
 
-        # One-sided magnitude scaling
-        sum_w = win_metrics.sum_w if win_metrics.sum_w > 0 else 1.0
+        # Magnitude scaling
         mag = np.abs(complex_spec) / sum_w
 
         # Multiply interior positive bins by 2
         if n_points % 2 == 0:
-            # Even N_fft: bins 1 to num_bins - 2 are interior
+            # Even N_fft: bins 1 to num_bins - 2 are interior positive bins
             mag[1:-1] *= 2.0
         else:
-            # Odd N_fft: bins 1 to num_bins - 1 are interior
+            # Odd N_fft: bins 1 to num_bins - 1 are interior positive bins
             mag[1:] *= 2.0
+
+        # One-sided PSD scaling (V^2 / Hz)
+        psd = (np.abs(complex_spec) ** 2) / (fs * sum_w2)
+        if n_points % 2 == 0:
+            psd[1:-1] *= 2.0
+        else:
+            psd[1:] *= 2.0
 
         is_onesided_res = True
     else:
@@ -305,8 +321,8 @@ def compute_fft(
         complex_spec = complex_fft
         freqs = np.fft.fftfreq(n_points, d=1.0 / fs)
 
-        sum_w = win_metrics.sum_w if win_metrics.sum_w > 0 else 1.0
         mag = np.abs(complex_spec) / sum_w
+        psd = (np.abs(complex_spec) ** 2) / (fs * sum_w2)
         is_onesided_res = False
 
     power = mag ** 2
@@ -316,6 +332,7 @@ def compute_fft(
         frequency_hz=freqs,
         magnitude=mag,
         power=power,
+        psd=psd,
         phase_rad=phase,
         complex_spectrum=complex_spec,
         sampling_frequency_hz=fs,
@@ -373,12 +390,14 @@ def compute_fft_shift(spectrum_res: SpectrumResult) -> SpectrumResult:
     shifted_complex = np.fft.fftshift(spectrum_res.complex_spectrum)
     shifted_mag = np.fft.fftshift(spectrum_res.magnitude)
     shifted_power = np.fft.fftshift(spectrum_res.power)
+    shifted_psd = np.fft.fftshift(spectrum_res.psd)
     shifted_phase = np.fft.fftshift(spectrum_res.phase_rad)
 
     return SpectrumResult(
         frequency_hz=shifted_freqs,
         magnitude=shifted_mag,
         power=shifted_power,
+        psd=shifted_psd,
         phase_rad=shifted_phase,
         complex_spectrum=shifted_complex,
         sampling_frequency_hz=spectrum_res.sampling_frequency_hz,
@@ -410,6 +429,11 @@ def find_dominant_frequency(
         delta = 0.5 * (alpha - gamma) / (alpha - 2*beta + gamma)
         f_est = (k* + delta) * Delta f_bin
 
+    Safely handles:
+        - Peak at DC (k* = 0)
+        - Peak at Nyquist (k* = len - 1)
+        - Flat / degenerate peaks (denom == 0)
+
     Args:
         spectrum_res: Input SpectrumResult container.
         ignore_dc: If True, excludes DC bin (bin 0) from peak search.
@@ -439,7 +463,7 @@ def find_dominant_frequency(
 
         if abs(denom) > 1e-12:
             delta = 0.5 * (alpha - gamma) / denom
-            # Clamp delta to [-0.5, 0.5] to prevent instability on degenerate noise peaks
+            # Clamp delta to [-0.5, 0.5] to prevent instability on noise spikes
             delta = float(np.clip(delta, -0.5, 0.5))
         else:
             delta = 0.0
@@ -468,9 +492,12 @@ def analyze_spectral_leakage(
     n_samples: int,
     windows: Optional[List[str]] = None
 ) -> SpectralLeakageResult:
-    """Analyze spectral leakage across multiple window functions for a given tone.
+    """Analyze spectral leakage and Peak Sidelobe Level (PSL) across multiple window functions.
 
-    Compares bin-centered vs non-bin-centered tones across Rectangular, Hann, Hamming, and Blackman.
+    Mainlobe Exclusion Rule:
+        Excludes the mainlobe region (|k - k*| <= R_mainlobe) before finding maximum sidelobe peak.
+        This provides a scientifically defensible Peak Sidelobe Level (PSL in dB):
+        PSL_dB = 20 * log10( max_sidelobe_mag / peak_mag )
 
     Args:
         signal_frequency_hz: Test tone frequency f in Hz.
@@ -479,7 +506,7 @@ def analyze_spectral_leakage(
         windows: List of window names to analyze (default: rect, hann, hamming, blackman).
 
     Returns:
-        SpectralLeakageResult container holding comparison spectra and leakage metrics.
+        SpectralLeakageResult container holding comparison spectra, peak magnitudes, and PSL values.
     """
     if windows is None:
         windows = ["rectangular", "hann", "hamming", "blackman"]
@@ -492,22 +519,35 @@ def analyze_spectral_leakage(
 
     spectra = {}
     peak_mags = {}
-    sidelobe_suppressions = {}
+    psl_db = {}
+    suppression_db = {}
 
     for w_name in windows:
         spec = compute_fft(x, sampling_rate_hz=sampling_rate_hz, window_type=w_name, one_sided=True)
         spectra[w_name] = spec
 
         dom = find_dominant_frequency(spec, ignore_dc=True, interpolate_subbin=True)
-        peak_mags[w_name] = dom.magnitude
+        peak_mag = dom.magnitude
+        peak_mags[w_name] = peak_mag
 
-        # Estimate sidelobe suppression (ratio of max off-peak bin to peak magnitude)
-        sorted_mags = sorted(spec.magnitude, reverse=True)
-        if len(sorted_mags) > 2 and sorted_mags[0] > 1e-12:
-            sidelobe_ratio_db = float(20.0 * np.log10(sorted_mags[2] / sorted_mags[0]))
+        k_peak = dom.raw_bin_index
+
+        # Define mainlobe exclusion radius (R = 4 bins)
+        r_mainlobe = 4
+        mags = np.copy(spec.magnitude)
+        lower_bound = max(0, k_peak - r_mainlobe)
+        upper_bound = min(len(mags), k_peak + r_mainlobe + 1)
+        mags[lower_bound:upper_bound] = 0.0
+        mags[0] = 0.0  # exclude DC
+
+        max_sidelobe = float(np.max(mags)) if len(mags) > 0 else 1e-12
+        if peak_mag > 1e-12 and max_sidelobe > 1e-12:
+            psl = float(20.0 * np.log10(max_sidelobe / peak_mag))
         else:
-            sidelobe_ratio_db = -100.0
-        sidelobe_suppressions[w_name] = sidelobe_ratio_db
+            psl = -100.0
+
+        psl_db[w_name] = psl
+        suppression_db[w_name] = -psl  # Positive dB value indicating suppression depth
 
     return SpectralLeakageResult(
         signal_frequency_hz=signal_frequency_hz,
@@ -516,7 +556,8 @@ def analyze_spectral_leakage(
         is_bin_centered=is_bin_centered,
         window_spectra=spectra,
         peak_magnitudes=peak_mags,
-        sidelobe_suppression_db=sidelobe_suppressions,
+        peak_sidelobe_level_db=psl_db,
+        sidelobe_suppression_db=suppression_db,
     )
 
 
@@ -561,6 +602,11 @@ def compute_stft(
 
     if len(x) == 0:
         raise ValueError("Input signal array for STFT is empty.")
+
+    if len(x) < nperseg:
+        raise ValueError(
+            f"Input signal length ({len(x)}) is shorter than STFT segment length nperseg ({nperseg})."
+        )
 
     if nperseg < 4:
         raise ValueError(f"nperseg must be at least 4, got {nperseg}")
