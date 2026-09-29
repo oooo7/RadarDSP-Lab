@@ -127,3 +127,44 @@ $$f_{b,\max} = \frac{F_s}{2} \implies R_{\max} = \frac{c \cdot F_s}{4 S} = \frac
 ## 9. Complex Baseband vs. Carrier RF Simulation Rationale
 
 Simulating RF carrier oscillations directly at $77\text{ GHz}$ would require a sampling rate $F_s > 154\text{ GHz}$, generating over $1.5 \times 10^7$ samples per microsecond. Complex baseband envelope modeling captures all phase, frequency, delay, and amplitude dynamics at standard ADC baseband rates ($10\text{ MHz}$), maintaining machine-precision accuracy while reducing compute overhead by $> 10,000 \times$.
+
+---
+
+## 10. Sampling Architecture: Chirp vs. Dechirped Beat Signal
+
+An important scientific sampling question arises when evaluating FMCW radar parameters: *How can a baseband ADC sampling rate of 20 MHz faithfully represent a 150 MHz sweep bandwidth chirp?*
+
+To answer this, `RadarDSP Lab` explicitly distinguishes between two receiver architectures:
+
+### Option A — Directly Sampled Chirp Receiver Architecture
+In a receiver that digitizes the raw transmit/receive chirp waveform directly before mixing, the ADC digitizer samples a signal with sweep bandwidth $B = 150\text{ MHz}$. By the Nyquist-Shannon sampling theorem:
+
+$$F_{s,\text{ADC}} \ge B \quad (\text{Complex Baseband}) \quad \text{or} \quad F_{s,\text{ADC}} \ge 2 B \quad (\text{Real Passband})$$
+
+Digitizing a $150\text{ MHz}$ chirp directly before mixing requires $F_s \ge 150\text{ MHz}$.
+
+### Option B — Analog Stretch Processing / Dechirp Mixer Architecture (Default Simulator Model)
+In standard FMCW radar hardware (e.g. 77 GHz automotive radars), de-chirping occurs in the **analog domain** before digitizer ADC sampling. An analog RF mixer multiplies the analog transmit chirp with the analog target echo:
+
+$$s_{\text{beat}}(t) = s_{\text{tx}}(t) \cdot s_{\text{rx}}^*(t) = \alpha A^2 \exp\left( j \left( 2\pi S \tau t - \pi S \tau^2 - \phi_{\text{target}} \right) \right)$$
+
+The resulting analog beat signal $s_{\text{beat}}(t)$ is a low-frequency sinusoid whose maximum frequency $f_{b,\max}$ depends on the maximum target processing range $R_{\max}$:
+
+$$f_{b,\max} = \frac{2 S R_{\max}}{c}$$
+
+For $R_{\max} = 500\text{ m}$ and $S = 1.5 \times 10^{12}\text{ Hz/s}$, $f_{b,\max} \approx 5.0035\text{ MHz}$.
+
+### Why the Default ADC Rate is 20 MHz
+The simulator processes the dechirped beat signal using a conventional one-sided Range FFT, mapping positive frequencies to the spectrum $[0, F_s / 2]$. For the maximum beat frequency $f_{b,\max} \approx 5.0035\text{ MHz}$ at $R_{\max} = 500\text{ m}$, the minimum required sampling rate to keep the beat frequency inside $[0, F_s / 2]$ is:
+
+$$F_{s,\text{min}} > 2 \cdot f_{b,\max} \approx 10.0069\text{ MHz}$$
+
+An ADC rate of $F_s = 10\text{ MHz}$ places the maximum beat frequency slightly above the $F_s / 2 = 5\text{ MHz}$ positive Nyquist limit. By selecting $F_s = 20\text{ MHz}$:
+
+- **Nyquist Limit ($F_s / 2$):** $10.0\text{ MHz}$
+- **Maximum Beat Frequency ($f_{b,\max}$):** $5.0035\text{ MHz}$
+- **Sampling Margin Ratio ($F_s / (2 f_{b,\max})$):** $1.9986$ ($99.86\%$ headroom)
+
+This guarantees that all dechirped beat signals up to $R_{\max} = 500\text{ m}$ lie strictly within the unambiguous positive-frequency Nyquist zone.
+
+

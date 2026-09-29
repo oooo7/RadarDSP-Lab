@@ -20,25 +20,26 @@ def run_smoke_test_phase6() -> None:
     print("RadarDSP Lab — Phase 6 FMCW Radar Range Engine")
     print("==================================================")
 
-    # 1. Radar Configuration
+    # 1. Radar Configuration & Scientific Sampling Audit
     cfg = RadarConfig(
         carrier_frequency_hz=77e9,
         sweep_bandwidth_hz=150e6,
         chirp_duration_sec=100e-6,
-        sampling_rate_hz=10e6
+        sampling_rate_hz=20e6
     )
 
-    chirp = generate_fmcw_chirp(cfg)
+    chirp = generate_fmcw_chirp(cfg, sampling_architecture="stretch_dechirp_analog")
 
-    print("\nRadar Configuration:")
-    print(f"  Carrier Frequency: {cfg.carrier_frequency_hz / 1e9:.2f} GHz")
-    print(f"  Bandwidth:         {cfg.sweep_bandwidth_hz / 1e6:.2f} MHz")
-    print(f"  Chirp Duration:    {cfg.chirp_duration_sec * 1e6:.2f} us")
-    print(f"  Sampling Rate:     {cfg.sampling_rate_hz / 1e6:.2f} MHz")
-    print(f"  Chirp Slope:       {chirp.chirp_slope_hz_per_sec:.2e} Hz/s")
-    print(f"  Range Resolution:  {chirp.range_resolution_m:.4f} m (~1.0 m)")
+    print("\nRadar Configuration & Scientific Sampling Model:")
+    print(f"  Carrier Frequency:     {cfg.carrier_frequency_hz / 1e9:.2f} GHz")
+    print(f"  Bandwidth:             {cfg.sweep_bandwidth_hz / 1e6:.2f} MHz")
+    print(f"  Chirp Duration:        {cfg.chirp_duration_sec * 1e6:.2f} us")
+    print(f"  ADC Sampling Rate:     {cfg.sampling_rate_hz / 1e6:.2f} MHz")
+    print(f"  Chirp Slope:           {chirp.chirp_slope_hz_per_sec:.2e} Hz/s")
+    print(f"  Range Resolution:      {chirp.range_resolution_m:.4f} m (~1.0 m)")
+    print(f"  Sampling Architecture: {chirp.metadata['sampling_architecture_description']}")
 
-    target_ranges = [50.0, 100.0, 150.0]
+    target_ranges = [50.0, 100.0, 150.0, 500.0]
 
     for r_target in target_ranges:
         print("\n------------------------------------------")
@@ -54,14 +55,19 @@ def run_smoke_test_phase6() -> None:
         print("\n------------------------------------------")
         print("RANGE PROCESSING")
         print("------------------------------------------")
-        res = estimate_range(payload, chirp, window_name="hann")
+        res = estimate_range(payload, chirp, window_name="hann", max_expected_range_m=500.0)
 
+        val = res.beat_sampling_validation
         print("  Window:                 Hann")
         print(f"  FFT Size:               {res.metadata['n_fft_samples']}")
         print(f"  Measured Beat Frequency: {res.beat_frequency_hz:.2f} Hz")
         print(f"  Estimated Range:        {res.estimated_range_m:.4f} m")
         print(f"  Range Error:            {res.range_error_m:.4f} m ({res.range_error_m * 1000:.2f} mm)")
         print(f"  Relative Range Error:   {res.relative_range_error * 100.0:.4f} %")
+        if val is not None:
+            print(f"  Nyquist Frequency:      {val.nyquist_frequency_hz / 1e6:.2f} MHz")
+            print(f"  Required Min Fs:        {val.minimum_required_beat_sampling_rate_hz / 1e6:.4f} MHz")
+            print(f"  Sampling Margin Ratio:  {val.sampling_margin_ratio:.4f} ({val.sampling_margin_ratio * 100 - 100:.2f}% headroom)")
 
     # Zero-Padding Comparison for 100 m Target
     print("\n==================================================")
@@ -70,10 +76,10 @@ def run_smoke_test_phase6() -> None:
     target_100 = TargetConfig(range_m=100.0, velocity_mps=0.0, rcs_sqm=1.0)
     payload_100 = simulate_target_echo(chirp, target_100)
 
-    for n_fft_val in [1000, 2000, 4000, 8000]:
-        res_zp = estimate_range(payload_100, chirp, window_name="hann", n_fft=n_fft_val)
+    for n_fft_val in [2000, 4000, 8000, 16000]:
+        res_zp = estimate_range(payload_100, chirp, window_name="hann", n_fft=n_fft_val, max_expected_range_m=500.0)
         print(
-            f"  N_fft: {n_fft_val:4d} | "
+            f"  N_fft: {n_fft_val:5d} | "
             f"Freq Bin Spacing: {res_zp.fft_bin_spacing_hz:8.2f} Hz | "
             f"Range Bin Spacing: {res_zp.range_bin_spacing_m:6.4f} m | "
             f"Estimated Range: {res_zp.estimated_range_m:8.4f} m | "

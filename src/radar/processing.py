@@ -2,7 +2,7 @@
 
 Provides de-chirping, 1D Range FFT computation, range-axis mapping,
 window selection, zero-padding interpolation, maximum unambiguous range calculation,
-and quantitative range estimation validation.
+beat signal sampling Nyquist validation, and quantitative range estimation.
 """
 
 from dataclasses import dataclass, field
@@ -22,6 +22,30 @@ from src.utils.config import RadarConfig
 
 # Speed of light in m/s
 SPEED_OF_LIGHT_M_PER_S = float(scipy.constants.c)
+
+
+@dataclass(frozen=True)
+class BeatSamplingValidation:
+    """Immutable payload validating ADC sampling rate Fs against the dechirped beat frequency bandwidth.
+
+    Attributes:
+        maximum_expected_range_m: Maximum target processing range R_max in meters.
+        maximum_beat_frequency_hz: Maximum expected beat frequency f_b_max = 2*S*R_max/c in Hz.
+        nyquist_frequency_hz: Nyquist frequency Fs / 2 in Hz.
+        minimum_required_beat_sampling_rate_hz: Minimum required sampling rate 2*f_b_max in Hz.
+        configured_sampling_rate_hz: Actual ADC sampling rate Fs in Hz.
+        sampling_margin_ratio: Ratio Fs / (2*f_b_max).
+        sampling_margin_hz: Difference Fs - 2*f_b_max in Hz.
+        is_valid: True if Fs > minimum_required_beat_sampling_rate_hz.
+    """
+    maximum_expected_range_m: float
+    maximum_beat_frequency_hz: float
+    nyquist_frequency_hz: float
+    minimum_required_beat_sampling_rate_hz: float
+    configured_sampling_rate_hz: float
+    sampling_margin_ratio: float
+    sampling_margin_hz: float
+    is_valid: bool
 
 
 @dataclass(frozen=True)
@@ -45,6 +69,7 @@ class RangeEstimateResult:
         beat_freq_axis_hz: 1D float64 array of positive frequency values in Hz.
         spectrum_magnitude: 1D float64 array of magnitude spectrum |X[k]|.
         spectrum_db: 1D float64 array of magnitude spectrum in dB.
+        beat_sampling_validation: BeatSamplingValidation container.
         metadata: Key-value dictionary of processing options.
     """
     estimated_range_m: float
@@ -63,7 +88,71 @@ class RangeEstimateResult:
     beat_freq_axis_hz: np.ndarray
     spectrum_magnitude: np.ndarray
     spectrum_db: np.ndarray
+    beat_sampling_validation: Optional[BeatSamplingValidation] = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def validate_beat_sampling_rate(
+    sampling_rate_hz: float,
+    chirp_slope_hz_per_sec: float,
+    max_expected_range_m: float = 500.0,
+    is_complex_beat: bool = False
+) -> BeatSamplingValidation:
+    """Validate ADC sampling rate Fs against the dechirped beat frequency bandwidth.
+
+    Sampling Architecture (Option B):
+        The ADC digitizes the analog dechirped beat signal s_beat(t) at sampling rate Fs.
+        Maximum beat frequency for range R_max is: f_b_max = 2 * S * R_max / c.
+        For one-sided FFT range processing, the beat frequency must fit strictly inside [0, Fs/2],
+        requiring minimum Fs > 2 * f_b_max.
+
+    Args:
+        sampling_rate_hz: ADC sampling rate Fs in Hz (> 0).
+        chirp_slope_hz_per_sec: Linear chirp slope S = B / T_c in Hz/s (> 0).
+        max_expected_range_m: Maximum processing target range R_max in meters.
+        is_complex_beat: Reserved parameter for complex spectrum range processing.
+
+    Returns:
+        BeatSamplingValidation container.
+
+    Raises:
+        ValueError: If sampling rate violates beat signal Nyquist criterion (Fs <= 2*f_b_max).
+    """
+    fs = float(sampling_rate_hz)
+    slope = float(chirp_slope_hz_per_sec)
+    r_max = float(max_expected_range_m)
+
+    if fs <= 0:
+        raise ValueError(f"Sampling rate Fs must be strictly positive (> 0), got {fs} Hz")
+    if slope <= 0:
+        raise ValueError(f"Chirp slope S must be strictly positive (> 0), got {slope} Hz/s")
+    if r_max <= 0:
+        raise ValueError(f"Maximum expected range R_max must be strictly positive (> 0), got {r_max} m")
+
+    fb_max = 2.0 * slope * r_max / SPEED_OF_LIGHT_M_PER_S
+    min_fs_req = 2.0 * fb_max
+    nyquist_freq = fs / 2.0
+    margin_ratio = fs / min_fs_req if min_fs_req > 0 else 1.0
+    margin_hz = fs - min_fs_req
+    is_satisfied = fs > min_fs_req
+
+    if not is_satisfied:
+        raise ValueError(
+            f"ADC sampling rate Fs={fs/1e6:.2f} MHz is insufficient for beat frequency bandwidth! "
+            f"For R_max={r_max:.1f} m, max beat frequency f_b_max={fb_max/1e6:.4f} MHz requires "
+            f"minimum Fs > {min_fs_req/1e6:.4f} MHz (Nyquist={min_fs_req/2e6:.4f} MHz), but Fs={fs/1e6:.2f} MHz was provided."
+        )
+
+    return BeatSamplingValidation(
+        maximum_expected_range_m=r_max,
+        maximum_beat_frequency_hz=fb_max,
+        nyquist_frequency_hz=nyquist_freq,
+        minimum_required_beat_sampling_rate_hz=min_fs_req,
+        configured_sampling_rate_hz=fs,
+        sampling_margin_ratio=margin_ratio,
+        sampling_margin_hz=margin_hz,
+        is_valid=is_satisfied,
+    )
 
 
 def dechirp_signal(
@@ -176,16 +265,18 @@ def estimate_range(
     tx_chirp: FMCWChirpContainer,
     window_name: str = "hann",
     n_fft: Optional[int] = None,
-    interpolate_subbin: bool = True
+    interpolate_subbin: bool = True,
+    max_expected_range_m: float = 490.0
 ) -> RangeEstimateResult:
     """Perform 1D Range FFT processing, range-axis mapping, and quantitative range estimation.
 
     FMCW Range Processing Pipeline:
-        1. Extract de-chirped beat signal s_beat(t).
-        2. Compute windowed one-sided FFT spectrum via Phase 3 compute_fft.
-        3. Map frequency axis f to Range axis: R(f) = c * f / (2 * S).
-        4. Detect peak beat frequency f_b using parabolic sub-bin interpolation.
-        5. Calculate estimated range R_est = c * f_b / (2 * S) and evaluate error metrics.
+        1. Validate ADC beat sampling Nyquist requirement for R_max.
+        2. Extract de-chirped beat signal s_beat(t).
+        3. Compute windowed one-sided FFT spectrum via Phase 3 compute_fft.
+        4. Map frequency axis f to Range axis: R(f) = c * f / (2 * S).
+        5. Detect peak beat frequency f_b using parabolic sub-bin interpolation.
+        6. Calculate estimated range R_est = c * f_b / (2 * S) and evaluate error metrics.
 
     Args:
         rx_payload: RadarRxPayload holding beat signal and true target state.
@@ -193,6 +284,7 @@ def estimate_range(
         window_name: Window function for spectral leakage suppression.
         n_fft: FFT length (supports zero-padding N_fft > N_signal).
         interpolate_subbin: If True, applies 3-point parabolic sub-bin interpolation.
+        max_expected_range_m: Maximum expected range R_max for beat Nyquist validation.
 
     Returns:
         RangeEstimateResult container with estimated range, error metrics, and spectra.
@@ -200,6 +292,14 @@ def estimate_range(
     fs = tx_chirp.sampling_rate_hz
     slope = tx_chirp.chirp_slope_hz_per_sec
     b = tx_chirp.bandwidth_hz
+
+    # Validate Beat Signal Sampling Architecture
+    beat_validation = validate_beat_sampling_rate(
+        sampling_rate_hz=fs,
+        chirp_slope_hz_per_sec=slope,
+        max_expected_range_m=max_expected_range_m,
+        is_complex_beat=False
+    )
 
     # 1. Range FFT using Phase 3 FFT engine
     spec_res = compute_range_fft(
@@ -253,11 +353,13 @@ def estimate_range(
         beat_freq_axis_hz=beat_freqs,
         spectrum_magnitude=spec_res.magnitude,
         spectrum_db=spec_res.magnitude_db,
+        beat_sampling_validation=beat_validation,
         metadata={
             "window_name": window_name,
             "n_signal_samples": spec_res.n_signal_samples,
             "n_fft_samples": spec_res.n_fft_samples,
             "is_zero_padded": spec_res.n_fft_samples > spec_res.n_signal_samples,
             "interpolated_subbin_index": dom_res.interpolated_bin,
+            "sampling_architecture": tx_chirp.sampling_architecture,
         },
     )

@@ -82,7 +82,7 @@ class RadarConfig(BaseModel):
     carrier_frequency_hz: float = Field(default=77e9, gt=0, description="Carrier frequency fc in Hz (e.g., 77 GHz)")
     sweep_bandwidth_hz: float = Field(default=150e6, gt=0, description="Chirp sweep bandwidth B in Hz")
     chirp_duration_sec: float = Field(default=100e-6, gt=0, description="Chirp duration T_c in seconds")
-    sampling_rate_hz: float = Field(default=10e6, gt=0, description="ADC sampling rate fs in Hz")
+    sampling_rate_hz: float = Field(default=20e6, gt=0, description="ADC sampling rate fs in Hz (default 20 MHz for robust beat Nyquist margin)")
     num_chirps: int = Field(default=64, ge=1, description="Number of chirps per frame for Doppler processing")
     tx_power_dbm: float = Field(default=10.0, description="Transmit power in dBm")
     noise_figure_db: float = Field(default=10.0, description="Receiver noise figure in dB")
