@@ -27,6 +27,7 @@ import numpy as np
 import scipy.signal
 
 from src.dsp.signals import SignalContainer, create_time_vector, generate_signal
+from src.dsp.transforms import compute_fft
 from src.utils.config import SignalGenConfig
 
 
@@ -159,7 +160,7 @@ def measure_alias_frequencies(
     sampled_signal: SignalContainer,
     num_peaks: int = 1
 ) -> List[float]:
-    """Measure apparent frequencies from sampled signal spectrum using FFT peak estimation.
+    """Measure apparent frequencies from sampled signal spectrum using canonical transforms engine.
 
     Employs real FFT and parabolic peak interpolation for sub-bin frequency accuracy.
 
@@ -176,51 +177,39 @@ def measure_alias_frequencies(
     if num_peaks < 1:
         raise ValueError(f"num_peaks must be at least 1, got {num_peaks}")
 
-    x = sampled_signal.amplitude
-    fs = sampled_signal.sampling_rate_hz
-    n = len(x)
+    spec = compute_fft(sampled_signal, window_type="rect", one_sided=True)
+    mags = np.copy(spec.magnitude)
+    n = spec.n_fft_samples
+    fs = spec.sampling_frequency_hz
 
     if n < 4:
         return [0.0] * num_peaks
 
-    # Compute Real FFT magnitude spectrum
-    fft_vals = np.abs(np.fft.rfft(x))
-    freq_bins = np.fft.rfftfreq(n, d=1.0 / fs)
+    # Ignore DC bin 0
+    if len(mags) > 1:
+        mags[0] = 0.0
 
-    # Ignore DC bin index 0 if non-DC signals are expected
-    fft_search = fft_vals.copy()
-    fft_search[0] = 0.0
-
-    # Find spectral peaks
-    peaks, _ = scipy.signal.find_peaks(fft_search, distance=max(1, int(n / 100)))
-
-    if len(peaks) == 0:
-        # Fallback to top magnitude bin indices if find_peaks returns no local peaks
-        top_indices = np.argsort(fft_search)[-num_peaks:][::-1]
-        peaks = top_indices
-
-    # Sort peaks by magnitude prominence
-    sorted_peaks = sorted(peaks, key=lambda idx: fft_search[idx], reverse=True)[:num_peaks]
+    top_indices = np.argsort(mags)[-num_peaks:][::-1]
+    bin_res = spec.bin_resolution_hz
 
     measured_freqs = []
-    for bin_idx in sorted_peaks:
-        # Parabolic interpolation for fine frequency estimation
-        if 0 < bin_idx < len(fft_vals) - 1:
-            alpha = fft_vals[bin_idx - 1]
-            beta = fft_vals[bin_idx]
-            gamma = fft_vals[bin_idx + 1]
+    for bin_idx in top_indices:
+        # Parabolic interpolation
+        if 0 < bin_idx < len(mags) - 1:
+            alpha = mags[bin_idx - 1]
+            beta = mags[bin_idx]
+            gamma = mags[bin_idx + 1]
             denom = alpha - 2.0 * beta + gamma
             if abs(denom) > 1e-12:
-                delta = 0.5 * (alpha - gamma) / denom
+                delta = float(np.clip(0.5 * (alpha - gamma) / denom, -0.5, 0.5))
             else:
                 delta = 0.0
         else:
             delta = 0.0
 
-        f_measured = (bin_idx + delta) * (fs / float(n))
+        f_measured = (bin_idx + delta) * bin_res
         measured_freqs.append(float(abs(f_measured)))
 
-    # Sort measured frequencies ascending
     measured_freqs.sort()
     return measured_freqs
 
