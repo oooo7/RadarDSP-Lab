@@ -23,7 +23,7 @@ from src.radar.doppler import (
     extract_range_doppler_peaks,
     generate_multi_chirp_data_cube,
 )
-from src.radar.noise import add_awgn_noise, compose_radar_environment
+from src.radar.noise import add_awgn_noise, calculate_noise_power, calculate_signal_power, compose_radar_environment
 from src.radar.processing import compute_range_fft
 from src.radar.target import TargetState
 from src.utils.config import CFARConfig as PydanticCFARConfig, RadarConfig, TargetConfig
@@ -86,6 +86,10 @@ class VelocityValidationResult:
 class SNRExperimentResult:
     """Result payload for SNR sensitivity sweep experiment."""
     snr_levels_db: List[float]
+    measured_snr_levels_db: List[float]
+    signal_powers: List[float]
+    noise_powers: List[float]
+    mean_detections_per_trial: List[float]
     detection_probabilities: List[float]
     missed_detection_rates: List[float]
     range_maes_m: List[float]
@@ -263,7 +267,7 @@ def run_snr_sweep_experiment(
     Args:
         config: Baseline RadarConfig.
         target: Ground truth TargetConfig (defaults to 100m range, 10m/s velocity).
-        snr_levels_db: List of SNR values in dB (defaults to [30, 25, 20, 15, 10, 5, 0, -5] dB).
+        snr_levels_db: List of SNR values in dB (defaults to [30, 20, 10, 0, -10, -20, -30, -35, -40] dB).
         num_trials_per_snr: Trials per SNR step (default 50).
         master_seed: Master seed for reproducibility.
 
@@ -282,14 +286,22 @@ def run_snr_sweep_experiment(
         range_m=100.0, velocity_mps=10.0, rcs_sqm=1.0, amplitude=1.0, target_id="T1"
     )
 
-    snr_list = snr_levels_db if snr_levels_db is not None else [30.0, 25.0, 20.0, 15.0, 10.0, 5.0, 0.0, -5.0]
+    snr_list = snr_levels_db if snr_levels_db is not None else [30.0, 20.0, 10.0, 0.0, -10.0, -20.0, -30.0, -35.0, -40.0]
 
+    meas_snr_list: List[float] = []
+    sig_power_list: List[float] = []
+    noise_power_list: List[float] = []
+    mean_dets_list: List[float] = []
     p_d_list: List[float] = []
     p_miss_list: List[float] = []
     r_mae_list: List[float] = []
     v_mae_list: List[float] = []
     r_rmse_list: List[float] = []
     v_rmse_list: List[float] = []
+
+    # Synthesize clean cube once to get base signal power
+    clean_cube = generate_multi_chirp_data_cube(config=cfg, targets=[tgt])
+    p_sig = calculate_signal_power(clean_cube.data)
 
     for step_idx, snr_val in enumerate(snr_list):
         step_master_seed = master_seed + step_idx * 10000
@@ -302,8 +314,22 @@ def run_snr_sweep_experiment(
 
         mc_res = run_monte_carlo_simulation(config=cfg, targets=[tgt], mc_config=mc_cfg)
 
+        # Measure noise power and resulting SNR from representative sample
+        env_sample = compose_radar_environment(clean_signal=clean_cube.data, snr_db=snr_val, seed=step_master_seed)
+        p_noise = env_sample.noise_power
+        meas_snr = env_sample.snr_db if env_sample.snr_db is not None else snr_val
+
+        total_dets = sum(len(match.unmatched_detections) + match.num_true_positives for match in mc_res.per_trial_matches)
+        mean_dets = total_dets / float(num_trials_per_snr)
+
         pd_val = mc_res.overall_detection_probability
         pmiss_val = 1.0 - pd_val
+
+        meas_snr_list.append(meas_snr)
+        sig_power_list.append(p_sig)
+        noise_power_list.append(p_noise)
+        mean_dets_list.append(mean_dets)
+
         p_d_list.append(pd_val)
         p_miss_list.append(pmiss_val)
 
@@ -317,6 +343,10 @@ def run_snr_sweep_experiment(
 
     return SNRExperimentResult(
         snr_levels_db=snr_list,
+        measured_snr_levels_db=meas_snr_list,
+        signal_powers=sig_power_list,
+        noise_powers=noise_power_list,
+        mean_detections_per_trial=mean_dets_list,
         detection_probabilities=p_d_list,
         missed_detection_rates=p_miss_list,
         range_maes_m=r_mae_list,
