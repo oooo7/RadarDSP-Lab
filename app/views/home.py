@@ -17,7 +17,7 @@ def render_home_page() -> None:
         A modular academic and engineering laboratory for exploring **Digital Signal Processing (DSP)**
         and **Frequency-Modulated Continuous-Wave (FMCW) Radar Processing** through interactive, real-time experiments.
         """,
-        unsafe_allow_map=True
+        unsafe_allow_html=True
     )
 
     st.markdown("---")

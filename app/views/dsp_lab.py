@@ -200,11 +200,11 @@ def _render_sampling_aliasing() -> None:
 
     with col_plot:
         try:
-            sig_orig = generate_sine(amplitude=1.0, frequency_hz=f_sig, sampling_rate_hz=fs, duration_sec=duration)
+            sig_orig = generate_sine(amplitude=1.0, frequency_hz=f_sig, phase_rad=0.0, sampling_rate_hz=fs, duration_sec=duration)
             res = sample_signal(sig_orig, target_fs_hz=fs)
 
             # Continuous reference
-            sig_cont = generate_sine(amplitude=1.0, frequency_hz=f_sig, sampling_rate_hz=fs * 20, duration_sec=duration)
+            sig_cont = generate_sine(amplitude=1.0, frequency_hz=f_sig, phase_rad=0.0, sampling_rate_hz=fs * 20, duration_sec=duration)
 
             fig, ax1 = plot_time_domain(sig_cont.time_vector, sig_cont.amplitude, title="Continuous Reference vs Discrete Samples").axes[0].figure, None
             ax = fig.axes[0]
@@ -213,7 +213,8 @@ def _render_sampling_aliasing() -> None:
             st.pyplot(fig, use_container_width=True)
 
             spec_res = compute_fft(res.sampled_signal.amplitude, sampling_rate_hz=fs)
-            fig_spec = plot_spectrum(spec_res.frequency_hz, spec_res.magnitude_spectrum, title=f"Sampled Spectrum (Peak = {spec_res.dominant_frequency_hz:.1f} Hz)", db_scale=False)
+            peak_f = spec_res.frequency_hz[np.argmax(spec_res.magnitude)]
+            fig_spec = plot_spectrum(spec_res.frequency_hz, spec_res.magnitude, title=f"Sampled Spectrum (Peak = {peak_f:.1f} Hz)", db_scale=False)
             fig_spec.axes[0].axvline(nyquist_freq, color="#FF7B72", linestyle="--", label=f"Nyquist Freq (Fs/2 = {nyquist_freq:.1f} Hz)")
             fig_spec.axes[0].legend(loc="upper right", facecolor="#161B22", edgecolor="#30363D")
             st.pyplot(fig_spec, use_container_width=True)
@@ -224,7 +225,7 @@ def _render_sampling_aliasing() -> None:
 
         st.markdown(
             f"**Nyquist Rate ($2 f$):** `{nyquist_rate:.1f} Hz` | **Nyquist Frequency ($F_s/2$):** `{nyquist_freq:.1f} Hz` | "
-            f"**Theoretical Alias ($f_{{alias}}$):** `{expected_alias:.1f} Hz` | **Measured Spectrum Peak:** `{spec_res.dominant_frequency_hz:.1f} Hz`"
+            f"**Theoretical Alias ($f_{{alias}}$):** `{expected_alias:.1f} Hz` | **Measured Spectrum Peak:** `{peak_f:.1f} Hz`"
         )
 
         if f_sig > nyquist_freq:
@@ -253,24 +254,26 @@ def _render_fft_spectrum() -> None:
         x = np.sin(2 * np.pi * f_sig * t)
 
         try:
-            res = compute_fft(x, sampling_rate_hz=fs, window_name=win_name, n_fft=n_fft)
+            res = compute_fft(x, sampling_rate_hz=fs, window_type=win_name, n_fft=n_fft)
 
-            fig = plot_spectrum(res.frequency_hz, res.magnitude_spectrum, title=f"FFT Spectrum (Window: {win_name}, N_fft={n_fft})", db_scale=scale_db)
+            fig = plot_spectrum(res.frequency_hz, res.magnitude, title=f"FFT Spectrum (Window: {win_name}, N_fft={n_fft})", db_scale=scale_db)
             st.pyplot(fig, use_container_width=True)
 
             df_physical = fs / n_samples
             df_grid = fs / n_fft
+            peak_f = float(res.frequency_hz[np.argmax(res.magnitude)])
+            est_amp = float(np.max(res.magnitude))
 
             st.markdown(
                 r"**Dominant Frequency Peak:** `"
-                + f"{res.dominant_frequency_hz:.2f} Hz` (True: {f_sig:.1f} Hz) | **Estimated Amplitude:** `{res.estimated_amplitude_v:.3f} V` | "
+                + f"{peak_f:.2f} Hz` (True: {f_sig:.1f} Hz) | **Estimated Amplitude:** `{est_amp:.3f} V` | "
                 + r"**Physical Resolution ($\Delta f = F_s / N$):** `"
                 + f"{df_physical:.2f} Hz` | **Zero-Padding Grid Spacing ($F_s / N_{{fft}}$):** `{df_grid:.2f} Hz`"
             )
             st.caption("Note: Zero-padding increases grid density for visual interpolation, but does NOT improve physical frequency resolution.")
 
             # Spectrum CSV Download Button
-            df_spec = pd.DataFrame({"frequency_hz": res.frequency_hz, "magnitude_volts": res.magnitude_spectrum})
+            df_spec = pd.DataFrame({"frequency_hz": res.frequency_hz, "magnitude_volts": res.magnitude})
             csv_spec = df_spec.to_csv(index=False)
             st.download_button(
                 label="💾 Download Spectrum CSV",
@@ -307,10 +310,10 @@ def _render_digital_filters() -> None:
     with col_plot:
         try:
             if family.startswith("FIR"):
-                f_coeffs = design_fir_filter(filter_type=ftype, cutoff_freq_hz=cutoff, sampling_rate_hz=fs, num_taps=order)
+                f_coeffs = design_fir_filter(filter_type=ftype, cutoff_hz=cutoff, order=order, sampling_rate_hz=fs)
                 resp = analyze_filter_response(f_coeffs, n_points=1024)
             else:
-                f_coeffs = design_iir_butterworth(filter_type=ftype, cutoff_freq_hz=cutoff, sampling_rate_hz=fs, order=order)
+                f_coeffs = design_iir_butterworth(filter_type=ftype, cutoff_hz=cutoff, order=order, sampling_rate_hz=fs)
                 resp = analyze_filter_response(f_coeffs, n_points=1024)
 
             st.pyplot(plot_filter_response(resp.frequency_hz, resp.magnitude_db, resp.phase_rad, resp.group_delay_samples, cutoff_freq_hz=cutoff), use_container_width=True)
@@ -335,22 +338,23 @@ def _render_resampling() -> None:
 
         if mode.startswith("Decimation"):
             factor_m = st.slider("Decimation Factor M:", 2, 8, 2)
-            res_obj = decimate_signal(x_in, sampling_rate_hz=fs_in, decimation_factor=factor_m)
+            res_obj = decimate_signal(x_in, factor_M=factor_m, sampling_rate_hz=fs_in)
         elif mode.startswith("Interpolation"):
             factor_l = st.slider("Interpolation Factor L:", 2, 8, 2)
-            res_obj = interpolate_signal(x_in, sampling_rate_hz=fs_in, interpolation_factor=factor_l)
+            res_obj = interpolate_signal(x_in, factor_L=factor_l, sampling_rate_hz=fs_in)
         else:
             up_l = st.slider("Upsample L:", 2, 5, 3)
             down_m = st.slider("Downsample M:", 2, 5, 2)
-            res_obj = resample_rational(x_in, sampling_rate_hz=fs_in, upsample_factor=up_l, downsample_factor=down_m)
+            res_obj = resample_rational(x_in, up_L=up_l, down_M=down_m, sampling_rate_hz=fs_in)
 
     with col_plot:
-        t_out = np.arange(len(res_obj.resampled_signal)) / res_obj.output_rate_hz
-        st.pyplot(plot_time_domain(t_out, res_obj.resampled_signal, title=f"Resampled Signal (Fs = {res_obj.output_rate_hz:.1f} Hz)"), use_container_width=True)
+        y_out = res_obj.processed_signal.amplitude if hasattr(res_obj.processed_signal, "amplitude") else res_obj.processed_signal
+        t_out = res_obj.processed_signal.time_vector if hasattr(res_obj.processed_signal, "time_vector") else np.arange(len(y_out)) / res_obj.output_sampling_rate_hz
+        st.pyplot(plot_time_domain(t_out, y_out, title=f"Resampled Signal (Fs = {res_obj.output_sampling_rate_hz:.1f} Hz)"), use_container_width=True)
 
         st.markdown(
-            f"**Input Rate:** `{res_obj.input_rate_hz:.1f} Hz` | **Output Rate:** `{res_obj.output_rate_hz:.1f} Hz` | "
-            f"**Input Samples:** `{res_obj.input_sample_count}` | **Output Samples:** `{res_obj.output_sample_count}`"
+            f"**Input Rate:** `{res_obj.input_sampling_rate_hz:.1f} Hz` | **Output Rate:** `{res_obj.output_sampling_rate_hz:.1f} Hz` | "
+            f"**Input Samples:** `{res_obj.input_num_samples}` | **Output Samples:** `{res_obj.output_num_samples}`"
         )
 
     render_theory_panel("resampling")

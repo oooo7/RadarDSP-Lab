@@ -98,17 +98,14 @@ def _render_single_target() -> None:
     with col_plot:
         try:
             tx_chirp = generate_fmcw_chirp(radar_cfg)
-            target_state = compute_target_state(target_cfg, chirp_slope_hz_per_sec=tx_chirp.chirp_slope_hz_per_sec, carrier_frequency_hz=fc)
-            rx_echo = simulate_target_echo(tx_chirp, target_state)
-            s_beat = dechirp_signal(tx_chirp, rx_echo)
-            spec_res = compute_range_fft(s_beat, sampling_rate_hz=fs, chirp_slope_hz_per_sec=tx_chirp.chirp_slope_hz_per_sec, window_name="hann")
-            range_est_res = estimate_range(spec_res, target_state.range_m)
+            rx_echo = simulate_target_echo(tx_chirp, target_cfg)
+            range_est_res = estimate_range(rx_echo, tx_chirp, window_name="hann")
 
             fig = plot_fmcw_processing_chain(
                 t_fast=tx_chirp.time_vector,
-                s_beat=s_beat.beat_signal,
-                r_axis=spec_res.range_m,
-                r_mag=spec_res.magnitude_spectrum,
+                s_beat=rx_echo.beat_signal,
+                r_axis=range_est_res.range_axis_m,
+                r_mag=range_est_res.spectrum_magnitude,
                 est_range_m=range_est_res.estimated_range_m,
                 true_range_m=target_r,
                 fc=fc,
@@ -122,9 +119,9 @@ def _render_single_target() -> None:
 
             st.markdown(
                 r"**True Range:** `"
-                + f"{target_r:.2f} m` | **Estimated Range:** `{range_est_res.estimated_range_m:.2f} m` | **Abs Error:** `{range_est_res.absolute_error_m:.4f} m` | "
+                + f"{target_r:.2f} m` | **Estimated Range:** `{range_est_res.estimated_range_m:.2f} m` | **Abs Error:** `{range_est_res.range_error_m:.4f} m` | "
                 + r"**Chirp Slope (S):** `"
-                + f"{tx_chirp.chirp_slope_hz_per_sec/1e12:.2f} MHz/µs` | **Beat Frequency ($f_b$):** `{target_state.theoretical_beat_frequency_hz/1e3:.2f} kHz` | "
+                + f"{tx_chirp.chirp_slope_hz_per_sec/1e12:.2f} MHz/µs` | **Beat Frequency ($f_b$):** `{range_est_res.theoretical_beat_frequency_hz/1e3:.2f} kHz` | "
                 + r"**Range Resolution ($\Delta R$):** `"
                 + f"{delta_r:.4f} m` | **Max Range:** `{r_max:.1f} m`"
             )
@@ -275,21 +272,23 @@ def _render_noise_clutter() -> None:
     with col_plot:
         radar_cfg = RadarConfig(carrier_frequency_hz=77e9, sweep_bandwidth_hz=150e6, chirp_duration_sec=100e-6, sampling_rate_hz=20e6)
         tx_chirp = generate_fmcw_chirp(radar_cfg)
-        t_state = compute_target_state(TargetConfig(range_m=100.0, velocity_mps=0.0), chirp_slope_hz_per_sec=tx_chirp.chirp_slope_hz_per_sec, carrier_frequency_hz=77e9)
+        t_state = TargetConfig(range_m=100.0, velocity_mps=0.0)
         rx_echo = simulate_target_echo(tx_chirp, t_state)
-        clean_beat = dechirp_signal(tx_chirp, rx_echo).beat_signal
+        clean_beat = rx_echo.beat_signal
 
         try:
-            noisy_beat, measured_snr = add_awgn_noise(clean_beat, snr_db=target_snr_db, seed=seed)
+            noise_res = add_awgn_noise(clean_beat, snr_db=target_snr_db, seed=seed)
+            noisy_beat = noise_res.noisy_signal
+            measured_snr = noise_res.snr_db
 
             if enable_clutter:
                 clutter_res = generate_clutter(shape=clean_beat.shape, clutter_power=clutter_strength, seed=seed)
                 noisy_beat = noisy_beat + clutter_res.clutter_signal
 
-            spec_clean = compute_range_fft(clean_beat, sampling_rate_hz=20e6, chirp_slope_hz_per_sec=tx_chirp.chirp_slope_hz_per_sec)
             spec_noisy = compute_range_fft(noisy_beat, sampling_rate_hz=20e6, chirp_slope_hz_per_sec=tx_chirp.chirp_slope_hz_per_sec)
+            r_axis = (3e8 * spec_noisy.frequency_hz) / (2.0 * tx_chirp.chirp_slope_hz_per_sec)
 
-            fig = plot_spectrum(spec_noisy.range_m, spec_noisy.magnitude_spectrum, title=f"Range Spectrum with Noise/Clutter (SNR={target_snr_db} dB)", db_scale=True)
+            fig = plot_spectrum(r_axis, spec_noisy.magnitude, title=f"Range Spectrum with Noise/Clutter (SNR={target_snr_db} dB)", db_scale=True)
             st.pyplot(fig, use_container_width=True)
 
             st.markdown(
@@ -353,3 +352,4 @@ def _render_ca_cfar() -> None:
             st.error(f"CFAR processing error: {e}")
 
     render_theory_panel("cfar")
+

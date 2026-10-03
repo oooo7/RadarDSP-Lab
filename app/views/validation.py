@@ -38,7 +38,7 @@ def _cached_snr_sweep_experiment(snr_levels: List[float]):
 
 @st.cache_data
 def _cached_false_alarm_experiment(pfa_levels: List[float]):
-    return run_false_alarm_experiment(target_pfa_levels=pfa_levels)
+    return run_false_alarm_experiment(pfa_levels=pfa_levels)
 
 
 @st.cache_data
@@ -80,31 +80,34 @@ def _render_range_accuracy() -> None:
     st.subheader("1. Range Estimation Accuracy Across Benchmark Distances")
 
     test_ranges = [50.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0]
-    results = _cached_range_experiment(test_ranges)
+    res = _cached_range_experiment(test_ranges)
 
     col1, col2 = st.columns([1, 1])
 
     with col1:
         records = []
-        for r in results:
+        for p in res.points:
+            within_res = p.abs_error_m <= res.range_resolution_m
             records.append({
-                "True Range (m)": r.theoretical_value,
-                "Estimated Range (m)": f"{r.estimated_value:.4f}",
-                "Abs Error (m)": f"{r.absolute_error:.4f}",
-                "Relative Error (%)": f"{r.relative_error * 100:.2f}%",
-                "Within Resolution Cell": "✅ YES" if r.is_within_resolution_cell else "❌ NO",
+                "True Range (m)": p.true_range_m,
+                "Estimated Range (m)": f"{p.estimated_range_m:.4f}",
+                "Abs Error (m)": f"{p.abs_error_m:.4f}",
+                "Relative Error (%)": f"{p.rel_error * 100:.2f}%",
+                "Within Resolution Cell": "✅ YES" if within_res else "❌ NO",
             })
         st.dataframe(pd.DataFrame(records), use_container_width=True)
 
-        mae = np.mean([r.absolute_error for r in results])
+        mae = res.aggregate_stats.mean_absolute_error
         st.markdown(
             r"**Mean Absolute Error (MAE):** `"
-            + f"{mae:.4f} m` | **Range Resolution Bound ($\Delta R$):** `{results[0].resolution_cell_size:.4f} m`"
+            + f"{mae:.4f} m` | "
+            + r"**Range Resolution Bound ($\Delta R$):** `"
+            + f"{res.range_resolution_m:.4f} m`"
         )
 
     with col2:
         fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
-        ax.plot([r.theoretical_value for r in results], [r.estimated_value for r in results], "bo-", label="Estimated vs True Range")
+        ax.plot([p.true_range_m for p in res.points], [p.estimated_range_m for p in res.points], "bo-", label="Estimated vs True Range")
         ax.plot([0, 500], [0, 500], "r--", label="Ideal 1:1 Identity Line")
         ax.set_title("True Range vs Estimated Range", fontweight="bold")
         ax.set_xlabel("True Range (m)")
@@ -120,31 +123,34 @@ def _render_velocity_accuracy() -> None:
     st.subheader("2. Radial Velocity Accuracy Across Kinematic Range")
 
     test_velocities = [-15.0, -10.0, -5.0, 0.0, 5.0, 10.0, 15.0]
-    results = _cached_velocity_experiment(test_velocities)
+    res = _cached_velocity_experiment(test_velocities)
 
     col1, col2 = st.columns([1, 1])
 
     with col1:
         records = []
-        for r in results:
+        for p in res.points:
+            within_res = p.abs_error_mps <= res.velocity_resolution_mps
             records.append({
-                "True Velocity (m/s)": r.theoretical_value,
-                "Estimated Velocity (m/s)": f"{r.estimated_value:+.4f}",
-                "Abs Error (m/s)": f"{r.absolute_error:.4f}",
-                "Relative Error (%)": f"{r.relative_error * 100:.2f}%" if abs(r.theoretical_value) >= 1e-3 else "0.00% (Stationary)",
-                "Within Resolution Cell": "✅ YES" if r.is_within_resolution_cell else "❌ NO",
+                "True Velocity (m/s)": p.true_velocity_mps,
+                "Estimated Velocity (m/s)": f"{p.estimated_velocity_mps:+.4f}",
+                "Abs Error (m/s)": f"{p.abs_error_mps:.4f}",
+                "Relative Error (%)": f"{p.rel_error * 100:.2f}%" if abs(p.true_velocity_mps) >= 1e-3 else "0.00% (Stationary)",
+                "Within Resolution Cell": "✅ YES" if within_res else "❌ NO",
             })
         st.dataframe(pd.DataFrame(records), use_container_width=True)
 
-        mae = np.mean([r.absolute_error for r in results])
+        mae = res.aggregate_stats.mean_absolute_error
         st.markdown(
             r"**Mean Absolute Error (MAE):** `"
-            + f"{mae:.4f} m/s` | **Velocity Resolution Bound ($\Delta v$):** `{results[0].resolution_cell_size:.4f} m/s`"
+            + f"{mae:.4f} m/s` | "
+            + r"**Velocity Resolution Bound ($\Delta v$):** `"
+            + f"{res.velocity_resolution_mps:.4f} m/s`"
         )
 
     with col2:
         fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
-        ax.plot([r.theoretical_value for r in results], [r.estimated_value for r in results], "go-", label="Estimated vs True Velocity")
+        ax.plot([p.true_velocity_mps for p in res.points], [p.estimated_velocity_mps for p in res.points], "go-", label="Estimated vs True Velocity")
         ax.plot([-20, 20], [-20, 20], "r--", label="Ideal 1:1 Identity Line")
         ax.set_title("True Velocity vs Estimated Velocity", fontweight="bold")
         ax.set_xlabel("True Radial Velocity (m/s)")
@@ -160,28 +166,28 @@ def _render_snr_sweep() -> None:
     st.subheader("3. Detection Probability & Range MAE vs SNR Sensitivity Sweep")
 
     snr_levels = [30.0, 20.0, 10.0, 0.0, -10.0, -20.0, -30.0, -35.0, -40.0]
-    results = _cached_snr_sweep_experiment(snr_levels)
+    res = _cached_snr_sweep_experiment(snr_levels)
 
     col1, col2 = st.columns([1, 1])
 
     with col1:
         records = []
-        for r in results:
+        for i in range(len(res.snr_levels_db)):
             records.append({
-                "Req SNR (dB)": r["requested_snr_db"],
-                "Meas SNR (dB)": f"{r['measured_snr_db']:.2f}",
-                "Pd": f"{r['detection_probability']:.2f}",
-                "Range MAE (m)": f"{r['range_mae_m']:.4f}",
-                "Velocity MAE (m/s)": f"{r['velocity_mae_mps']:.4f}",
-                "CFAR Detections": r["mean_cfar_detections"],
+                "Req SNR (dB)": res.snr_levels_db[i],
+                "Meas SNR (dB)": f"{res.measured_snr_levels_db[i]:.2f}",
+                "Pd": f"{res.detection_probabilities[i]:.2f}",
+                "Range MAE (m)": f"{res.range_maes_m[i]:.4f}",
+                "Velocity MAE (m/s)": f"{res.velocity_maes_mps[i]:.4f}",
+                "CFAR Detections": res.mean_detections_per_trial[i],
             })
         st.dataframe(pd.DataFrame(records), use_container_width=True)
 
     with col2:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 5), dpi=100)
-        snrs = [r["requested_snr_db"] for r in results]
-        pds = [r["detection_probability"] for r in results]
-        maes = [r["range_mae_m"] for r in results]
+        snrs = res.snr_levels_db
+        pds = res.detection_probabilities
+        maes = res.range_maes_m
 
         ax1.plot(snrs, pds, "ro-", lw=1.8)
         ax1.set_title("Detection Probability (Pd) vs SNR", fontweight="bold")
@@ -206,15 +212,15 @@ def _render_false_alarm_analysis() -> None:
     st.subheader("4. CA-CFAR Empirical False Alarm Rate Analysis")
 
     pfa_levels = [1e-2, 1e-3, 1e-4]
-    results = _cached_false_alarm_experiment(pfa_levels)
+    res = _cached_false_alarm_experiment(pfa_levels)
 
     records = []
-    for r in results:
+    for p in res.points:
         records.append({
-            "Target Pfa": f"{r['target_pfa']:.0e}",
-            "Noise-Only Empirical Pfa": f"{r['empirical_pfa_noise_only']:.6f}",
-            "Clutter Empirical Pfa": f"{r['empirical_pfa_clutter']:.6f}",
-            "Threshold Multiplier (alpha)": f"{r['alpha']:.4f}",
+            "Target Pfa": f"{p.configured_pfa:.0e}",
+            "Noise-Only Empirical Pfa": f"{p.empirical_pfa_noise_only:.6f}",
+            "Clutter Empirical Pfa": f"{p.empirical_pfa_clutter:.6f}",
+            "Evaluated Cells / Trial": p.total_evaluated_cells_per_trial,
         })
     st.dataframe(pd.DataFrame(records), use_container_width=True)
 
@@ -226,12 +232,18 @@ def _render_monte_carlo() -> None:
 
     mc_res = _cached_monte_carlo_experiment(num_trials=100)
 
+    range_maes = [s.mean_absolute_error for s in mc_res.aggregate_range_stats.values()] if mc_res.aggregate_range_stats else [0.0]
+    vel_maes = [s.mean_absolute_error for s in mc_res.aggregate_velocity_stats.values()] if mc_res.aggregate_velocity_stats else [0.0]
+    overall_range_mae = float(np.mean(range_maes))
+    overall_vel_mae = float(np.mean(vel_maes))
+
     st.markdown(
-        f"**Total Trials:** `{mc_res['num_trials']}` | **Overall Detection Probability ($P_d$):** `{mc_res['overall_detection_probability']*100:.1f}%` | "
-        f"**True Positives (TP):** `{mc_res['total_true_positives']}` | **Missed Detections (FN):** `{mc_res['total_false_negatives']}` | "
-        f"**Range MAE:** `{mc_res['overall_range_mae_m']:.4f} m` | **Velocity MAE:** `{mc_res['overall_velocity_mae_mps']:.4f} m/s`"
+        f"**Total Trials:** `{mc_res.num_trials}` | **Overall Detection Probability ($P_d$):** `{mc_res.overall_detection_probability*100:.1f}%` | "
+        f"**Missed Detections (FN):** `{mc_res.total_missed_detections}` | **False Detections (FP):** `{mc_res.total_false_detections}` | "
+        f"**Range MAE:** `{overall_range_mae:.4f} m` | **Velocity MAE:** `{overall_vel_mae:.4f} m/s`"
     )
 
     st.info("Unmatched CFAR-positive cells represent adaptive threshold exceedances. Physical target assignment requires 1-to-1 resolution-gated matching.")
 
     render_theory_panel("validation")
+
